@@ -33,6 +33,7 @@ from urllib.request import urlopen
 import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from verifier.__main__ import _Exit, _is_connection_error, _run
@@ -41,6 +42,7 @@ from verifier.models import Report
 from verifier.report import report_view
 
 PAGE = Path(__file__).with_name("webui") / "index.html"
+STATIC = Path(__file__).with_name("webui") / "static"  # fonts, logo, header theme: copied from Ask the Workspace
 EXAMPLE = Path(__file__).with_name("testsets") / "leave-policy"
 MAX_DOCS = 30
 MAX_DOC_BYTES = 1_000_000
@@ -174,6 +176,7 @@ def _health(settings: VerifierSettings) -> dict:
 def create_app(*, reasoner_factory=None, store_factory=None) -> FastAPI:
     """`reasoner_factory` / `store_factory` are for tests; by default the real Claude and database are used."""
     app = FastAPI(title="Claim Verifier", docs_url=None, redoc_url=None)
+    app.mount("/static", StaticFiles(directory=STATIC), name="static")
     runs: dict[str, RunState] = {}
     lock = threading.Lock()
 

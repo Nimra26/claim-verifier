@@ -411,7 +411,8 @@ Full design and decisions: [docs/design.md](docs/design.md). Build plan: [docs/p
 verifier/            the Claim Verifier
   __main__.py        command line: python -m verifier run <folder>
   web.py             browser page: python -m verifier.web
-  webui/index.html   the page itself (no outside scripts; works offline)
+  webui/index.html   the page itself, in the Ask the Workspace look (no outside scripts; works offline)
+  webui/static/      fonts, logo and header theme copied from Ask the Workspace
   graph.py           the LangGraph graph
   rules.py           labelling, outdated rule, when to ask a person, which claim answers
   reasoner.py        Claude calls (Claude Code login or API) and their schemas

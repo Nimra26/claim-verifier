@@ -1,175 +1,223 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Claim Verifier</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Claim Verifier · Taleemabad</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+<link rel="stylesheet" href="/static/fonts/fonts.css?v=1" />
+<link rel="stylesheet" href="/static/css/app_theme.css?v=1" />
 <style>
-:root {
-  --bg: #f6f7f9; --card: #ffffff; --ink: #1b1f24; --muted: #5d6673; --line: #e3e6ea; --accent: #2f5bd3;
-  --accent-ink: #ffffff; --soft: #eef2fb;
-  --verified: #1f7a4d; --verified-bg: #e4f4ec;
-  --single: #2a5db0; --single-bg: #e6eefb;
-  --contra: #b42318; --contra-bg: #fdecea;
-  --outdated: #9a5b00; --outdated-bg: #fdf1dc;
-  --noev: #555e6b; --noev-bg: #eceef1;
-  --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
-}
-@media (prefers-color-scheme: dark) {
+  /* Same look as Ask the Workspace (templates/workspace_ui.html): Taleemabad brand, blue header, sidebar + main column.
+     Blue anchors, green resolves, yellow initiates; #E94E5A only for errors and disagreement. */
   :root {
-    --bg: #111418; --card: #1a1e24; --ink: #e8eaed; --muted: #9aa3ae; --line: #2c323a; --accent: #6d8ff0;
-    --accent-ink: #0d1117; --soft: #1f2633;
-    --verified: #5fd39a; --verified-bg: #16362a; --single: #8fb2f5; --single-bg: #1a2a45;
-    --contra: #ff8a80; --contra-bg: #3d1c1a; --outdated: #f3b65a; --outdated-bg: #3a2c12;
-    --noev: #b4bcc6; --noev-bg: #2a2f36; --shadow: none;
+    --blue: #3860C1; --blue-600: #2C4FA6; --blue-50: #EEF2FB; --blue-100: #DCE4F7;
+    --green: #17C65D; --green-50: #E8F9EF; --green-700: #0E8A41;
+    --yellow: #EFAF22; --yellow-50: #FEF6E2; --yellow-700: #8A5A00;
+    --error: #E94E5A; --error-50: #FDEDEF; --error-700: #A61F2B;
+    --ink: #151719; --ink-2: #3B4250; --muted: #6B7280; --line: #E6EAF1; --bg: #F5F7FB; --card: #FFFFFF;
+    --shadow-sm: 0 1px 2px rgba(21,23,25,.05), 0 1px 3px rgba(21,23,25,.06);
+    --shadow-md: 0 4px 14px rgba(56,96,193,.10), 0 2px 6px rgba(21,23,25,.05);
+    --head: "Fredoka", "Segoe UI", system-ui, sans-serif; --body: "Poppins", "Segoe UI", system-ui, sans-serif;
+    --r: 16px;
   }
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-.wrap { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
-h1 { font-size: 24px; margin: 0; letter-spacing: -.01em; }
-.sub { color: var(--muted); margin: 2px 0 0; }
-.pills { display: flex; gap: 8px; flex-wrap: wrap; }
-.pill { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); cursor: default; }
-.pill::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--muted); }
-.pill.ok::before { background: var(--verified); } .pill.bad::before { background: var(--contra); }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
-.card h2 { font-size: 16px; margin: 0 0 12px; }
-label.f { display: block; font-weight: 600; margin-bottom: 6px; }
-textarea, input[type=date], input[type=text] { width: 100%; font: inherit; color: var(--ink); background: var(--bg);
-  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
-textarea { min-height: 64px; resize: vertical; }
-.drop { border: 2px dashed var(--line); border-radius: 10px; padding: 22px; text-align: center; color: var(--muted); cursor: pointer; }
-.drop.over { border-color: var(--accent); background: var(--soft); }
-.drop strong { color: var(--accent); }
-.docs { margin-top: 12px; display: grid; gap: 10px; }
-.doc { display: grid; grid-template-columns: 1fr 170px 32px; gap: 10px; align-items: start; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
-.doc .name { font-weight: 600; word-break: break-all; }
-.doc .title { color: var(--muted); font-size: 13px; }
-.doc .rep { grid-column: 1 / -1; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
-.doc .rep label { display: inline-flex; gap: 5px; align-items: center; color: var(--ink); }
-.x { border: 0; background: transparent; color: var(--muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 6px; }
-.x:hover { color: var(--contra); }
-.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.btn { font: inherit; font-weight: 600; border-radius: 8px; padding: 10px 16px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
-.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.btn:disabled { opacity: .5; cursor: not-allowed; }
-.note { font-size: 13px; color: var(--muted); }
-.err { color: var(--contra); font-weight: 600; margin-top: 10px; }
-.steps { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 14px; }
-.step { padding: 6px 12px; border-radius: 999px; background: var(--bg); color: var(--muted); font-size: 14px; }
-.step.now { background: var(--soft); color: var(--accent); font-weight: 600; }
-.step.done { color: var(--verified); }
-.spinner { width: 16px; height: 16px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: spin .8s linear infinite; vertical-align: -3px; margin-right: 8px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.ask { border: 2px solid var(--accent); background: var(--soft); }
-.choices { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
-.answer { border-left: 6px solid var(--verified); }
-.answer.none { border-left-color: var(--noev); }
-.answer .q { color: var(--muted); font-size: 14px; margin-bottom: 4px; }
-.answer .a { font-size: 20px; font-weight: 600; line-height: 1.4; }
-.answer .caveat { margin-top: 10px; padding: 8px 12px; background: var(--outdated-bg); color: var(--outdated); border-radius: 8px; font-size: 14px; }
-.answer .detail { margin-top: 6px; color: var(--muted); }
-.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.chip { border: 1px solid transparent; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
-.chip.off { opacity: .35; }
-.lab { display: inline-block; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; }
-.verified { background: var(--verified-bg); color: var(--verified); }
-.single_source { background: var(--single-bg); color: var(--single); }
-.contradicted { background: var(--contra-bg); color: var(--contra); }
-.outdated { background: var(--outdated-bg); color: var(--outdated); }
-.no_evidence { background: var(--noev-bg); color: var(--noev); }
-.claims { display: grid; gap: 10px; }
-.claim { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
-.claim .top { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
-.claim .text { font-weight: 600; }
-.claim .meta { font-size: 13px; color: var(--muted); margin-top: 4px; }
-.claim .why { margin-top: 6px; }
-.claim details { margin-top: 6px; font-size: 14px; }
-.claim summary { cursor: pointer; color: var(--accent); }
-.quote { margin: 6px 0 0; padding: 6px 10px; border-left: 3px solid var(--line); color: var(--muted); }
-.tag { font-size: 12px; color: var(--outdated); font-weight: 600; margin-left: 6px; }
-.side { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
-.side > div { background: var(--bg); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
-.side b { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
-ul.plain { margin: 0; padding-left: 18px; }
-.hidden { display: none !important; }
-@media (max-width: 640px) {
-  .doc { grid-template-columns: 1fr 32px; } .doc .date { grid-column: 1 / 2; }
-  .side { grid-template-columns: 1fr; }
-}
+  * { box-sizing: border-box; }
+  [hidden], .hidden { display: none !important; }
+  body { margin: 0; background: radial-gradient(1200px 500px at 85% -10%, var(--blue-50), transparent 60%), var(--bg); color: var(--ink); font: 14.5px/1.65 var(--body); }
+  a { color: var(--blue); }
+  header.apphead { position: sticky; top: 0; z-index: 10; }
+  .apphead .brandrow { flex-wrap: wrap; height: auto; min-height: 36px; }
+  .spacer { flex: 1; }
+  .apphead .pill { min-width: 0; cursor: default; }
+
+  .layout { padding: 22px 24px; display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 24px; align-items: start; max-width: 1400px; margin: 0 auto; }
+  aside { display: grid; gap: 14px; position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; padding-right: 2px; align-content: start; }
+  main { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-content: start; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; box-shadow: var(--shadow-sm); }
+  .card h2 { font: 600 15px var(--head); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; color: var(--ink); }
+  .card h2 .n { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font: 700 12px var(--head); color: #fff; }
+  .muted { color: var(--muted); font-size: 12.5px; }
+  textarea, input[type=date] { width: 100%; font: 13.5px var(--body); color: var(--ink); background: #fff; border: 1px solid #CDD5E3; border-radius: 11px; padding: 9px 11px; }
+  textarea { min-height: 76px; resize: vertical; line-height: 1.5; }
+  textarea:focus, input[type=date]:focus { outline: 2px solid var(--blue-100); border-color: var(--blue); }
+
+  .drop { border: 1.5px dashed var(--blue-100); background: var(--blue-50); border-radius: 12px; padding: 16px 12px; text-align: center; color: var(--ink-2); font-size: 13px; cursor: pointer; transition: border-color .12s, background .12s; }
+  .drop:hover, .drop.over { border-color: var(--blue); background: #E4EBFA; }
+  .drop b { color: var(--blue-600); }
+  .docs { margin-top: 10px; display: grid; gap: 8px; }
+  .doc { border: 1px solid var(--line); border-radius: 12px; padding: 10px 11px; background: #FBFCFE; }
+  .doc .top { display: flex; gap: 8px; align-items: flex-start; }
+  .doc .name { font-weight: 600; color: var(--ink-2); font-size: 13px; overflow-wrap: anywhere; flex: 1; }
+  .doc .title { color: var(--muted); font-size: 12px; }
+  .doc .date { margin-top: 8px; }
+  .doc .rep { margin-top: 8px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+  .doc .rep label { display: inline-flex; gap: 4px; align-items: center; color: var(--ink-2); overflow-wrap: anywhere; }
+  .x { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; border-radius: 6px; }
+  .x:hover { color: var(--error-700); background: var(--error-50); }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: 500 13.5px var(--body); border-radius: 11px; padding: 9px 18px; border: 1px solid var(--line); background: #fff; color: var(--ink-2); cursor: pointer; text-decoration: none; transition: background .12s, border-color .12s; }
+  .btn:hover { border-color: var(--blue); color: var(--blue-600); }
+  .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .btn.primary:hover { background: var(--blue-600); color: #fff; }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .runrow { display: grid; gap: 8px; }
+  .runrow .btn.primary { width: 100%; padding: 11px 18px; font-size: 14.5px; }
+  .banner { border-radius: 12px; padding: 10px 12px; font-size: 13px; }
+  .banner.err { background: var(--error-50); color: var(--error-700); border: 1px solid #F7C9CE; }
+  .note { margin: 10px 0 0; font-size: 12.5px; border-radius: 10px; padding: 8px 11px; background: var(--yellow-50); color: var(--yellow-700); }
+
+  /* Welcome, as on the Ask page */
+  .welcome { text-align: center; padding: 26px 10px 6px; }
+  .welcome h3 { font: 700 30px/1.2 var(--head); margin: 0 0 6px; color: var(--ink); }
+  .welcome h3 span { color: var(--blue); }
+  .welcome p { color: var(--muted); margin: 0 auto 22px; max-width: 64ch; }
+  .steps3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; text-align: left; margin-bottom: 22px; }
+  .step3 { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; box-shadow: var(--shadow-sm); }
+  .step3 .n { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font: 700 15px var(--head); color: #fff; margin-bottom: 10px; }
+  .step3:nth-child(1) .n { background: var(--yellow); } .step3:nth-child(2) .n { background: var(--blue); } .step3:nth-child(3) .n { background: var(--green); }
+  .step3 b { display: block; font: 600 15px var(--head); margin-bottom: 4px; }
+  .step3 span { color: var(--muted); font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip { background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font: 13px var(--body); cursor: pointer; color: var(--ink-2); box-shadow: var(--shadow-sm); transition: transform .12s, border-color .12s; }
+  .chip:hover { border-color: var(--blue); transform: translateY(-1px); color: var(--blue-600); }
+  .chip:disabled { opacity: .6; cursor: default; transform: none; }
+
+  /* Progress */
+  .progress h2 .spin { width: 16px; height: 16px; border: 2px solid var(--blue-100); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .stepline { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 10px; }
+  .stp { font-size: 12.5px; font-weight: 500; border-radius: 999px; padding: 4px 12px; background: #F1F2F5; color: var(--muted); }
+  .stp.now { background: var(--blue-50); color: var(--blue-600); border: 1px solid var(--blue-100); }
+  .stp.done { background: var(--green-50); color: var(--green-700); }
+  .ask { border: 1.5px solid var(--yellow); background: var(--yellow-50); }
+  .ask h2 { color: var(--yellow-700); }
+  .ask .qtext { color: var(--ink); font-size: 14.5px; }
+  .clarify-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .clarify-choices .chip { min-height: 40px; }
+
+  /* Question and answer, as on the Ask page */
+  .q { justify-self: end; max-width: min(80%, 85ch); background: var(--blue); color: #fff; border-radius: 18px 18px 6px 18px; padding: 11px 16px; white-space: pre-wrap; box-shadow: var(--shadow-md); }
+  .a { background: var(--card); border: 1px solid var(--line); border-radius: 18px 18px 18px 6px; padding: 16px 18px; box-shadow: var(--shadow-md); }
+  .ahead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 4px 11px; white-space: nowrap; }
+  .status.ok, .lab.verified { background: var(--green-50); color: var(--green-700); }
+  .status.warn, .lab.outdated { background: var(--yellow-50); color: var(--yellow-700); }
+  .status.neutral, .lab.no_evidence { background: #F1F2F5; color: var(--ink-2); }
+  .lab.single_source { background: var(--blue-50); color: var(--blue-600); }
+  .lab.contradicted { background: var(--error-50); color: var(--error-700); }
+  .lab { display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 11px; white-space: nowrap; }
+  .text { margin: 8px 0 4px; font-size: 15px; color: var(--ink); }
+  .detail { color: var(--muted); font-size: 13px; }
+  .label { font: 600 11px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 14px 0 6px; }
+  .afoot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+
+  /* Claims and contradictions, styled like the Ask page's sources */
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .filters .lab { cursor: pointer; border: 1px solid transparent; }
+  .filters .lab.off { opacity: .35; }
+  .claims { display: grid; gap: 10px; }
+  .src { border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; font-size: 13px; background: #FBFCFE; }
+  .src .head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+  .src .ct { font-weight: 600; color: var(--ink); font-size: 14px; }
+  .src .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .src .why { color: var(--ink-2); margin-top: 6px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 6px; padding: 0 6px; margin-left: 6px; vertical-align: 1px; }
+  .tag.key { background: var(--blue-50); color: var(--blue-600); }
+  .tag.low { background: var(--yellow-50); color: var(--yellow-700); }
+  .tag.you { background: var(--green-50); color: var(--green-700); }
+  .src details { margin-top: 6px; }
+  .src summary { cursor: pointer; color: var(--blue); font-weight: 500; font-size: 12.5px; }
+  .passage { color: var(--ink-2); margin-top: 6px; padding: 6px 10px; border-left: 3px solid var(--blue-100); background: #fff; border-radius: 0 8px 8px 0; font-size: 12.5px; white-space: pre-wrap; }
+  .side { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .side > div { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; color: var(--ink-2); }
+  .side b { display: block; font: 600 11px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+  ul.plain { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13.5px; }
+
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+    aside { position: static; max-height: none; overflow: visible; }
+    .steps3 { grid-template-columns: minmax(0, 1fr); }
+    .side { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div>
-      <h1>Claim Verifier</h1>
-      <p class="sub">Checks what your documents actually support, what is outdated, and where they disagree.</p>
+<header class="apphead">
+  <div class="bar">
+    <div class="brandrow">
+      <span class="logo"><img src="/static/img/taleemabad-wordmark.png" alt="Taleemabad" /></span>
+      <h1><span class="product">Claim Verifier</span><span class="pagename">R&amp;D prototype</span></h1>
+      <span class="spacer"></span>
+      <span id="pills" style="display:flex;gap:8px;flex-wrap:wrap"></span>
     </div>
-    <div class="pills" id="pills"></div>
-  </header>
+  </div>
+</header>
 
-  <!-- 1. Set up a check -->
-  <section id="setup">
+<div class="layout">
+  <aside>
     <div class="card">
-      <label class="f" for="question">Your question</label>
+      <h2><span class="n" style="background:var(--blue)">1</span>Your question</h2>
       <textarea id="question" placeholder="e.g. How many days of annual leave does a full-time employee get?"></textarea>
     </div>
     <div class="card">
-      <h2>Documents</h2>
-      <div class="drop" id="drop" tabindex="0">
-        Drop <b>.md</b> or <b>.txt</b> files here, or <strong>choose files</strong>
-        <input type="file" id="files" accept=".md,.txt,text/plain,text/markdown" multiple hidden>
-      </div>
+      <h2><span class="n" style="background:var(--yellow)">2</span>Documents</h2>
+      <div class="drop" id="drop" tabindex="0">Drop <b>.md</b> or <b>.txt</b> files here, or <b>choose files</b>
+        <input type="file" id="files" accept=".md,.txt,text/plain,text/markdown" multiple hidden></div>
       <div class="docs" id="docs"></div>
-      <p class="note">Add the date each document was issued if you know it. The newer document wins when two disagree.
-        Tick “replaces” when a document says it replaces another.</p>
+      <p class="muted" style="margin:10px 0 0">Add the date each document was issued if you know it: the newer one wins when two disagree. Tick “replaces” when a document says it replaces another.</p>
     </div>
-    <div class="row">
+    <div class="runrow">
       <button class="btn primary" id="run">Run check</button>
-      <button class="btn" id="example">Try the example</button>
-      <span class="note">Document text is sent to Claude. Use made-up or public documents only.</span>
+      <div class="banner err hidden" id="setupErr"></div>
+      <p class="muted" style="margin:0">Document text is sent to Claude. Use made-up or public documents only.</p>
     </div>
-    <div class="err" id="setupErr"></div>
-  </section>
+  </aside>
 
-  <!-- 2. Running -->
-  <section id="running" class="hidden">
-    <div class="card">
-      <h2 id="runTitle"><span class="spinner"></span>Checking your documents…</h2>
-      <div class="steps" id="steps"></div>
-      <div class="note" id="runNote"></div>
-    </div>
-    <div class="card ask hidden" id="ask">
-      <h2>We need your decision</h2>
-      <div id="askText"></div>
-      <div class="choices" id="askChoices"></div>
-      <p class="note">The check is paused until you answer. <button class="btn" id="stop" style="padding:4px 10px">Stop the check</button></p>
-    </div>
-    <div class="err" id="runErr"></div>
-  </section>
+  <main>
+    <!-- Before the first check -->
+    <section id="welcome">
+      <div class="welcome">
+        <h3>Check your documents <span>before you trust the answer</span></h3>
+        <p>Give it a question and the documents on that topic. It pulls out every claim, finds the evidence, and tells you what is verified, outdated, contradicted or unsupported, and says so when there is not enough evidence.</p>
+        <div class="steps3">
+          <div class="step3"><div class="n">1</div><b>Ask one question</b><span>A factual one: a number, a rule, a name, a date.</span></div>
+          <div class="step3"><div class="n">2</div><b>Add the documents</b><span>With their dates, and which ones replace others.</span></div>
+          <div class="step3"><div class="n">3</div><b>Read the verified report</b><span>Every claim labelled, with the passage behind it.</span></div>
+        </div>
+        <div class="chips"><button class="chip" id="example">Try the example: five leave-policy documents</button></div>
+      </div>
+    </section>
 
-  <!-- 3. Report -->
-  <section id="result" class="hidden">
-    <div class="card answer" id="answer"></div>
-    <div class="card">
-      <h2>Claims</h2>
-      <div class="chips" id="chips"></div>
-      <div class="claims" id="claims"></div>
-    </div>
-    <div class="card" id="contraCard"><h2>Contradictions</h2><div id="contra"></div></div>
-    <div class="card hidden" id="settledCard"><h2>Settled by you</h2><ul class="plain" id="settled"></ul></div>
-    <div class="card hidden" id="failCard"><h2>Could not check</h2><ul class="plain" id="fails"></ul></div>
-    <div class="row">
-      <button class="btn primary" id="again">Change and run again</button>
-      <button class="btn" id="fresh">New check</button>
-      <a class="btn" id="dlmd" download>Download report (.md)</a>
-      <a class="btn" id="dljson" download>Download data (.json)</a>
-    </div>
-  </section>
+    <!-- Running -->
+    <section id="running" class="hidden" style="display:grid;gap:16px">
+      <div class="card progress">
+        <h2 id="runTitle"><span class="spin"></span>Checking your documents…</h2>
+        <div class="stepline" id="steps"></div>
+        <div class="muted" id="runNote"></div>
+      </div>
+      <div class="card ask hidden" id="ask">
+        <h2>We need your decision</h2>
+        <div class="qtext" id="askText"></div>
+        <div class="clarify-choices" id="askChoices"></div>
+        <p class="muted" style="margin:12px 0 0">The check is paused until you answer. <button class="btn" id="stop" style="padding:3px 10px;font-size:12.5px">Stop the check</button></p>
+      </div>
+      <div class="banner err hidden" id="runErr"></div>
+    </section>
+
+    <!-- Report -->
+    <section id="result" class="hidden" style="display:grid;gap:16px">
+      <div class="q" id="askedQ"></div>
+      <div class="a" id="answer"></div>
+      <div class="card">
+        <h2>Claims</h2>
+        <div class="filters" id="chips"></div>
+        <div class="claims" id="claims"></div>
+      </div>
+      <div class="card"><h2>Contradictions</h2><div class="claims" id="contra"></div></div>
+      <div class="card hidden" id="settledCard"><h2>Settled by you</h2><ul class="plain" id="settled"></ul></div>
+      <div class="card hidden" id="failCard"><h2>Could not check</h2><ul class="plain" id="fails"></ul></div>
+    </section>
+  </main>
 </div>
 
 <script>
@@ -179,41 +227,36 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 let docs = [];          // {name, text, date, replaces:[]}
 let runId = null, timer = null, filters = new Set();
 
-// ---------- service status ----------
+// ---------- service status (header pills, as on the Ask page) ----------
 async function health() {
   try {
     const h = await (await fetch("/api/health")).json();
     const names = { database: "Database", search: "Search model", claude: "Claude" };
     const box = $("pills"); box.replaceChildren();
     for (const [k, v] of Object.entries(h)) {
-      const p = el("span", "pill " + (v.ok ? "ok" : "bad"), names[k]);
-      p.title = v.ok ? "Ready" : v.help;
-      box.append(p);
+      const p = el("span", "pill " + (v.ok ? "ok" : "bad")); p.append(el("i"), document.createTextNode(names[k] + (v.ok ? "" : ": not ready")));
+      p.title = v.ok ? "Ready" : v.help; box.append(p);
     }
     return Object.values(h).every((v) => v.ok) ? null : Object.values(h).filter((v) => !v.ok).map((v) => v.help).join(" ");
   } catch { return "The page lost contact with the checker. Is it still running?"; }
 }
+function showErr(id, msg) { $(id).textContent = msg || ""; $(id).classList.toggle("hidden", !msg); }
 
 // ---------- documents ----------
-function titleOf(text, name) {
-  const m = text.match(/^#\s+(.+)$/m);
-  return m ? m[1].trim() : name.replace(/\.(md|txt)$/i, "");
-}
-function guessDate(name, text) {
-  const m = (name + " " + text.slice(0, 400)).match(/\b(20\d\d|19\d\d)-(\d\d)-(\d\d)\b/);
-  return m ? m[0] : "";
-}
+function titleOf(text, name) { const m = text.match(/^#\s+(.+)$/m); return m ? m[1].trim() : name.replace(/\.(md|txt)$/i, ""); }
+function guessDate(name, text) { const m = (name + " " + text.slice(0, 400)).match(/\b(20\d\d|19\d\d)-(\d\d)-(\d\d)\b/); return m ? m[0] : ""; }
 function renderDocs() {
   const box = $("docs"); box.replaceChildren();
   docs.forEach((d, i) => {
     const row = el("div", "doc");
-    const info = el("div");
-    info.append(el("div", "name", d.name), el("div", "title", titleOf(d.text, d.name) + " · " + d.text.length.toLocaleString() + " characters"));
+    const top = el("div", "top");
+    const info = el("div", "name", d.name); info.append(el("div", "title", titleOf(d.text, d.name)));
+    const x = el("button", "x", "×"); x.title = "Remove"; x.setAttribute("aria-label", "Remove " + d.name);
+    x.onclick = () => { const gone = d.name; docs.splice(i, 1); docs.forEach((o) => o.replaces = o.replaces.filter((r) => r !== gone)); renderDocs(); };
+    top.append(info, x);
     const date = el("input", "date"); date.type = "date"; date.value = d.date || ""; date.title = "Date issued (optional)";
     date.onchange = () => { d.date = date.value; };
-    const x = el("button", "x", "×"); x.title = "Remove";
-    x.onclick = () => { const gone = d.name; docs.splice(i, 1); docs.forEach((o) => o.replaces = o.replaces.filter((r) => r !== gone)); renderDocs(); };
-    row.append(info, date, x);
+    row.append(top, date);
     const others = docs.filter((o) => o !== d);
     if (others.length) {
       const rep = el("div", "rep"); rep.append(el("span", null, "Replaces:"));
@@ -228,16 +271,15 @@ function renderDocs() {
   });
 }
 async function addFiles(list) {
-  $("setupErr").textContent = "";
+  showErr("setupErr", "");
   const skipped = [];
   for (const f of list) {
     if (!/\.(md|txt)$/i.test(f.name)) { skipped.push(f.name); continue; }
     const text = await f.text();
     const existing = docs.find((d) => d.name === f.name);
-    if (existing) existing.text = text;
-    else docs.push({ name: f.name, text, date: guessDate(f.name, text), replaces: [] });
+    if (existing) existing.text = text; else docs.push({ name: f.name, text, date: guessDate(f.name, text), replaces: [] });
   }
-  if (skipped.length) $("setupErr").textContent = "Skipped (only .md and .txt can be checked): " + skipped.join(", ");
+  if (skipped.length) showErr("setupErr", "Skipped (only .md and .txt can be checked): " + skipped.join(", "));
   renderDocs();
 }
 const drop = $("drop");
@@ -247,47 +289,42 @@ $("files").onchange = (e) => { addFiles([...e.target.files]); e.target.value = "
 drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
 drop.ondragleave = () => drop.classList.remove("over");
 drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); addFiles([...e.dataTransfer.files]); };
-
 $("example").onclick = async () => {
   const ex = await (await fetch("/api/example")).json();
   $("question").value = ex.question;
   docs = ex.documents.map((d) => ({ ...d, date: d.date || "", replaces: d.replaces || [] }));
-  renderDocs(); $("setupErr").textContent = "";
+  renderDocs(); showErr("setupErr", "");
 };
 
 // ---------- running ----------
-function show(id) { for (const s of ["setup", "running", "result"]) $(s).classList.toggle("hidden", s !== id); window.scrollTo(0, 0); }
-
+function show(id) { for (const s of ["welcome", "running", "result"]) $(s).classList.toggle("hidden", s !== id); window.scrollTo(0, 0); }
 $("run").onclick = async () => {
-  $("setupErr").textContent = "";
+  showErr("setupErr", "");
   const problem = await health();
-  if (problem) { $("setupErr").textContent = problem; return; }
+  if (problem) { showErr("setupErr", problem); return; }
   const body = { question: $("question").value, documents: docs.map((d) => ({ name: d.name, text: d.text, date: d.date || null, replaces: d.replaces })) };
   $("run").disabled = true;
   try {
     const r = await fetch("/api/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await r.json();
-    if (!r.ok) { $("setupErr").textContent = typeof data.detail === "string" ? data.detail : "Please check the question and documents."; return; }
-    runId = data.id; $("runErr").textContent = ""; show("running"); poll();
-  } finally { $("run").disabled = false; }
+    if (!r.ok) { showErr("setupErr", typeof data.detail === "string" ? data.detail : "Please check the question and documents."); $("run").disabled = false; return; }
+    runId = data.id; showErr("runErr", ""); resetRunning(); show("running"); poll();
+  } catch { showErr("setupErr", "The page lost contact with the checker. Is it still running?"); $("run").disabled = false; }
 };
-
 const STEPS = [["indexing", "Reading documents"], ["checking", "Checking claims"], ["waiting", "Your decision"], ["done", "Report"]];
 function renderSteps(status) {
   const order = ["starting", "indexing", "checking", "waiting", "done"];
-  const box = $("steps"); box.replaceChildren();
-  STEPS.forEach(([key, words]) => {
-    let cls = "step";
-    if (key === status) cls += " now";
-    else if (order.indexOf(key) < order.indexOf(status) && key !== "waiting") cls += " done";
-    box.append(el("span", cls, words));
-  });
+  $("steps").replaceChildren(...STEPS.map(([key, words]) => {
+    let cls = "stp";
+    if (key === status) cls += " now"; else if (key !== "waiting" && order.indexOf(key) < order.indexOf(status)) cls += " done";
+    return el("span", cls, words);
+  }));
 }
 async function poll() {
   clearTimeout(timer);
   let s;
   try { s = await (await fetch("/api/runs/" + runId)).json(); }
-  catch { $("runErr").textContent = "Lost contact with the checker. Is it still running?"; timer = setTimeout(poll, 3000); return; }
+  catch { showErr("runErr", "Lost contact with the checker. Is it still running?"); timer = setTimeout(poll, 3000); return; }
   renderSteps(s.status);
   $("runNote").textContent = `Running for ${s.elapsed} s. A few documents usually take about a minute.`;
   const waiting = s.status === "waiting" && s.question;
@@ -297,54 +334,63 @@ async function poll() {
     $("askText").textContent = s.question.text;
     const box = $("askChoices"); box.replaceChildren();
     s.question.choices.forEach((c) => {
-      const b = el("button", "btn", c);
+      const b = el("button", "chip", c);
       b.onclick = async () => {
         [...box.children].forEach((x) => x.disabled = true);
         const r = await fetch(`/api/runs/${runId}/answer`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ choice: c }) });
-        if (!r.ok) { $("runErr").textContent = (await r.json()).detail; [...box.children].forEach((x) => x.disabled = false); return; }
+        if (!r.ok) { showErr("runErr", (await r.json()).detail); [...box.children].forEach((x) => x.disabled = false); return; }
         $("ask").classList.add("hidden"); $("ask").dataset.qid = ""; poll();
       };
       box.append(b);
     });
   }
-  if (s.status === "done" || (s.status === "failed" && s.report)) { renderReport(s.report); return; }
+  if (s.status === "done" || (s.status === "failed" && s.report)) { $("run").disabled = false; renderReport(s.report); return; }
   if (s.status === "failed" || s.status === "cancelled") {
+    $("run").disabled = false;
     $("runTitle").textContent = s.status === "cancelled" ? "Check stopped" : "The check could not run";
-    $("runErr").textContent = s.message;
-    const back = el("button", "btn", "Back"); back.style.marginTop = "10px"; back.onclick = () => { resetRunning(); show("setup"); };
-    $("runErr").append(document.createElement("br"), back);
+    showErr("runErr", s.message);
     return;
   }
   timer = setTimeout(poll, waiting ? 1500 : 1000);
 }
-function resetRunning() { $("runTitle").innerHTML = '<span class="spinner"></span>Checking your documents…'; $("runErr").textContent = ""; $("ask").dataset.qid = ""; }
+function resetRunning() { $("runTitle").innerHTML = '<span class="spin"></span>Checking your documents…'; showErr("runErr", ""); $("ask").dataset.qid = ""; $("ask").classList.add("hidden"); }
 $("stop").onclick = async () => { await fetch(`/api/runs/${runId}/cancel`, { method: "POST" }); poll(); };
 
 // ---------- report ----------
 function renderReport(r) {
-  resetRunning(); show("result");
+  show("result");
+  $("askedQ").textContent = r.question;
   const a = $("answer"); a.replaceChildren();
-  a.classList.toggle("none", r.answer.status !== "answered");
-  a.append(el("div", "q", r.question), el("div", "a", r.answer.headline));
+  const head = el("div", "ahead");
+  const answered = r.answer.status === "answered";
+  head.append(el("span", "status " + (!answered ? "neutral" : r.answer.caveat ? "warn" : "ok"),
+    !answered ? "Not enough evidence" : r.answer.caveat ? "Answered, with a caveat" : "Answered from your documents"));
+  a.append(head, el("div", "text", r.answer.headline));
   if (r.answer.detail) a.append(el("div", "detail", r.answer.detail));
-  if (r.answer.caveat) a.append(el("div", "caveat", r.answer.caveat));
+  if (r.answer.caveat) a.append(el("div", "note", r.answer.caveat));
+  const foot = el("div", "afoot");
+  const md = el("a", "btn", "Download report (.md)"); md.href = `/api/runs/${runId}/report.md`; md.download = "";
+  const js = el("a", "btn", "Download data (.json)"); js.href = `/api/runs/${runId}/report.json`; js.download = "";
+  const again = el("button", "btn primary", "Change and run again"); again.onclick = () => { show("welcome"); $("question").focus(); };
+  const fresh = el("button", "btn", "New check"); fresh.onclick = () => { docs = []; renderDocs(); $("question").value = ""; show("welcome"); };
+  foot.append(again, fresh, md, js); a.append(foot);
 
   filters = new Set();
   const chips = $("chips"); chips.replaceChildren();
   r.counts.forEach((c) => {
     if (!c.n) return;
-    const chip = el("span", "chip lab " + c.label, `${c.words} · ${c.n}`);
-    chip.onclick = () => { filters.has(c.label) ? filters.delete(c.label) : filters.add(c.label); drawClaims(r); drawChips(); };
-    chip.dataset.label = c.label; chips.append(chip);
+    const chip = el("span", "lab " + c.label, `${c.words} · ${c.n}`); chip.dataset.label = c.label; chip.title = "Show only these";
+    chip.onclick = () => { filters.has(c.label) ? filters.delete(c.label) : filters.add(c.label);
+      [...chips.children].forEach((ch) => ch.classList.toggle("off", filters.size > 0 && !filters.has(ch.dataset.label))); drawClaims(r); };
+    chips.append(chip);
   });
-  function drawChips() { [...chips.children].forEach((ch) => ch.classList.toggle("off", filters.size > 0 && !filters.has(ch.dataset.label))); }
   drawClaims(r);
 
   const cb = $("contra"); cb.replaceChildren();
-  if (!r.contradictions.length) cb.append(el("p", "note", "None."));
+  if (!r.contradictions.length) cb.append(el("p", "muted", "None."));
   r.contradictions.forEach((c) => {
-    const box = el("div", "claim");
-    const top = el("div", "top"); top.append(el("div", "text", c.text), el("span", "lab " + c.label, c.label_words));
+    const box = el("div", "src");
+    const top = el("div", "head"); top.append(el("div", "ct", c.text), el("span", "lab " + c.label, c.label_words));
     const side = el("div", "side");
     const one = el("div"); one.append(el("b", null, "This document says"), document.createTextNode(c.this_side));
     const two = el("div"); two.append(el("b", null, "The other side says"));
@@ -353,35 +399,29 @@ function renderReport(r) {
     if (c.replaced) box.append(el("div", "meta", c.replaced));
     cb.append(box);
   });
-
   $("settledCard").classList.toggle("hidden", !r.settled.length);
   $("settled").replaceChildren(...r.settled.map((s) => el("li", null, `${s.question} → ${s.answer}`)));
   $("failCard").classList.toggle("hidden", !r.failures.length);
   $("fails").replaceChildren(...r.failures.map((f) => el("li", null, f)));
-  $("dlmd").href = `/api/runs/${runId}/report.md`; $("dljson").href = `/api/runs/${runId}/report.json`;
 }
 function drawClaims(r) {
-  const box = $("claims"); box.replaceChildren();
-  r.claims.filter((c) => !filters.size || filters.has(c.label)).forEach((c) => {
-    const card = el("div", "claim");
-    const top = el("div", "top");
-    const t = el("div", "text", c.text);
-    if (c.important) { const s = el("span", "tag", "answers the question"); s.style.color = "var(--accent)"; t.append(s); }
-    if (c.low_confidence) t.append(el("span", "tag", "low confidence"));
-    if (c.settled_by_person) t.append(el("span", "tag", "settled by you"));
-    top.append(t, el("span", "lab " + c.label, c.label_words));
-    card.append(top, el("div", "meta", c.source), el("div", "why", c.why));
+  $("claims").replaceChildren(...r.claims.filter((c) => !filters.size || filters.has(c.label)).map((c) => {
+    const card = el("div", "src");
+    const head = el("div", "head");
+    const t = el("div", "ct", c.text);
+    if (c.important) t.append(el("span", "tag key", "answers the question"));
+    if (c.low_confidence) t.append(el("span", "tag low", "low confidence"));
+    if (c.settled_by_person) t.append(el("span", "tag you", "settled by you"));
+    head.append(t, el("span", "lab " + c.label, c.label_words));
+    card.append(head, el("div", "meta", c.source), el("div", "why", c.why));
     if (c.evidence.length) {
       const d = el("details"); d.append(el("summary", null, `Evidence (${c.evidence.length})`));
-      c.evidence.forEach((q) => d.append(el("div", "quote", q)));
+      c.evidence.forEach((q) => d.append(el("div", "passage", q)));
       card.append(d);
     }
-    box.append(card);
-  });
+    return card;
+  }));
 }
-$("again").onclick = () => show("setup");
-$("fresh").onclick = () => { docs = []; renderDocs(); $("question").value = ""; show("setup"); };
-
 health(); setInterval(health, 15000);
 </script>
 </body>

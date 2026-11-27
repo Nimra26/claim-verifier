@@ -1,0 +1,95 @@
+/* The one top bar every page uses: templates/partials/app_header.html (markup), this file (look).
+   Full width, fixed heights. Below 1600px: two rows, row 1 the logo, "Ask the Workspace", the page name and the
+   page's status pill, row 2 the nav. From 1600px (where the admin nav fits beside the longest name + pill): one row,
+   the nav at the right end. Which layout is decided by the screen width only, never by the page, and a short or long
+   page name changes nothing about the nav, so it sits at the same place on every page (4 Nov: Settings had
+   one centred row, Monitor two; then: one row whenever it fits).
+   Page styles must not restyle header, .bar, .logo, h1 or .hbtn; they keep only page-specific extras. */
+/* Every page keeps the scrollbar's room (the Ask and Known issues pages already did), so a page that is shorter than
+   the window doesn't put the right-hand nav 15px further right than a page that scrolls. */
+html { scrollbar-gutter: stable; }
+header.apphead {
+  background: linear-gradient(90deg, #3860C1 0%, #2C4FA6 100%);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(21,23,25,.05), 0 1px 3px rgba(21,23,25,.06);
+}
+.apphead .bar { margin: 0; max-width: none; padding: 8px 24px 10px; display: grid; gap: 8px; }
+.apphead .brandrow { display: flex; align-items: center; gap: 12px; height: 36px; min-width: 0; }
+.apphead .logo { background: #fff; border-radius: 10px; padding: 5px 9px; display: flex; flex: none; }
+.apphead .logo img { height: 22px; display: block; }
+.apphead h1 { margin: 0; display: flex; align-items: baseline; gap: 10px; min-width: 0; white-space: nowrap;
+  font: 600 20px/1.2 var(--head, "Fredoka", "Segoe UI", system-ui, sans-serif); letter-spacing: .2px; color: #fff; }
+.apphead .product { flex: none; }
+/* The organisation's name (access.json "organisation"), after the product name; a long one ends in "…" (full name in
+   the tooltip). It gives way first when the row is short. */
+.apphead .org { flex: 0 1 auto; min-width: 0; max-width: 24ch; overflow: hidden; text-overflow: ellipsis;
+  font: 500 13px/1.2 var(--body, "Poppins", "Segoe UI", system-ui, sans-serif); color: rgba(255,255,255,.85);
+  background: rgba(255,255,255,.14); border-radius: 999px; padding: 3px 10px; align-self: center; }
+.apphead .pagename { min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-left: 10px;
+  border-left: 1px solid rgba(255,255,255,.45); font: 500 17px/1.2 var(--body, "Poppins", "Segoe UI", system-ui, sans-serif);
+  color: rgba(255,255,255,.92); }
+/* The status pill (Ask: the model; Monitor: live updates). The page's script sets class "pill ok|warn|bad". */
+.apphead .pill { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 150px;
+  font: 500 12.5px var(--body, "Poppins", "Segoe UI", system-ui, sans-serif); border-radius: 999px; padding: 5px 12px;
+  background: rgba(255,255,255,.14); color: #fff; }
+.apphead .pill i { width: 8px; height: 8px; border-radius: 50%; background: #9CA3AF; box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
+.apphead .pill.ok i { background: #17C65D; }
+.apphead .pill.warn i { background: #EFAF22; }
+.apphead .pill.bad i { background: #E94E5A; }
+.apphead .appnav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 34px; }
+.apphead .hbtn { color: #fff; text-decoration: none; font: 500 13px/20px var(--body, "Poppins", "Segoe UI", system-ui, sans-serif);
+  border: 1px solid rgba(255,255,255,.35); border-radius: 10px; padding: 6px 12px; background: transparent; cursor: pointer; }
+.apphead .hbtn:hover { background: rgba(255,255,255,.12); }
+.apphead .hbtn.on { background: rgba(255,255,255,.22); cursor: default; }
+/* Wide screens: one row. The name side may shrink (the page name gets "…"), the nav never moves or wraps. */
+@media (min-width: 1600px) {
+  .apphead .bar { display: flex; align-items: center; gap: 16px; padding: 8px 24px; }
+  .apphead .brandrow { flex: 0 1 auto; }
+  .apphead .appnav { flex: none; margin-left: auto; flex-wrap: nowrap; }
+}
+@media (max-width: 620px) {
+  .apphead .bar { padding: 8px 16px 10px; }
+  .apphead .brandrow { gap: 10px; }
+  .apphead h1 { font-size: 18px; }
+  .apphead .pagename { font-size: 15px; }
+  /* A phone has room for the logo, one name and the pill: the page name replaces the product name. */
+  .apphead h1:has(.pagename) .product { display: none; }
+  .apphead .org { display: none; }  /* no room on a phone; the About page shows it */
+  /* 19 Nov (UI check): on the Ask page (no page name) "Ask the Workspace" ran under the status pill at 390 px with a
+     scrollbar (5 px), more on a 360 px phone. The name gives way with "…"; the pill stays whole. */
+  .apphead .product { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .apphead .pagename { padding-left: 0; border-left: 0; }
+  .apphead .pill { min-width: 0; padding: 4px 10px; }
+  .apphead .appnav { gap: 6px; }
+  .apphead .hbtn { padding: 4px 10px; font-size: 12.5px; }
+}
+
+/* Dropdowns (4 Nov: they looked like browser defaults). Native <select> kept for the keyboard, phone pickers
+   and every script; only drawn the app's way: the inputs' border, radius, height and font, a chevron, a focus ring.
+   "html select" outranks a page's plain "select { ... }" rule but not a class rule such as ".langpick select", so a
+   page can still size one select its own way; the height comes from the padding. A page sets the width. */
+html select {
+  -webkit-appearance: none; appearance: none;
+  font: 400 14px/1.4 var(--body, "Poppins", "Segoe UI", system-ui, sans-serif);
+  color: var(--ink, #151719);
+  background-color: var(--card, #fff);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236B7280' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px 14px;
+  border: 1px solid #CDD5E3;
+  border-radius: 10px;
+  padding: 8px 34px 8px 11px;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+/* The chevron is always drawn, so its room is kept even when a page sets its own padding. */
+html select:not([multiple]) { padding-right: 34px; }
+html select:hover { border-color: var(--blue, #3860C1); }
+html select:focus { outline: none; border-color: var(--blue, #3860C1); box-shadow: 0 0 0 3px var(--blue-100, #DCE4F7); }
+html select:disabled { cursor: not-allowed; color: var(--muted, #6B7280); background-color: #F0F2F6; border-color: var(--line, #E6EAF1); opacity: .8; }
+html select option { color: var(--ink, #151719); background: #fff; }
+/* Right-to-left (Urdu): the chevron and the room for it move to the left. */
+html select[dir="rtl"]:not([multiple]), html [dir="rtl"] select:not([multiple]) { background-position: left 10px center; padding-left: 34px; padding-right: 11px; }
+/* A list box (multiple / size) shows its options, so no chevron. */
+html select[multiple], html select[size]:not([size="1"]) { background-image: none; padding-right: 11px; }

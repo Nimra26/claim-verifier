@@ -39,6 +39,9 @@ def wait_for(client, run_id, statuses, timeout=20):
 
 def test_page_and_example(client):
     assert "Claim Verifier" in client.get("/").text
+    for path in ("/static/css/app_theme.css", "/static/fonts/fonts.css", "/static/img/taleemabad-wordmark.png",
+                 "/static/fonts/poppins-400-latin.woff2", "/static/favicon.svg"):
+        assert client.get(path).status_code == 200, path
     ex = client.get("/api/example").json()
     assert ex["question"] and len(ex["documents"]) == 5
     assert all(d["text"].strip() for d in ex["documents"])
