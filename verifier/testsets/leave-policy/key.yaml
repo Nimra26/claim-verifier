@@ -1,0 +1,12 @@
+answer_status: answered
+claims:
+  - {doc: leave-policy-2023, contains: "20 days", label: outdated}
+  - {doc: leave-policy-2025, contains: "25 days", label: single_source}
+  - {doc: leave-policy-2023, contains: "line manager", label: verified}
+  - {doc: leave-policy-2025, contains: "line manager", label: verified}
+  - {doc: leave-faq, contains: "line manager", label: verified}
+  - {doc: leave-faq, contains: "5 days", label: contradicted}
+  - {doc: staff-handbook-extract, contains: "10 days", label: contradicted}
+  - {doc: staff-handbook-extract, contains: "wellness day", label: single_source}
+  - {doc: leave-policy-2025, contains: "10 days", label: single_source}
+  - {doc: sick-leave-memo-2022, contains: "5 days", label: outdated}

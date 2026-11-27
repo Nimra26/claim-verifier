@@ -1,0 +1,14 @@
+question: How many weeks of maternity leave does an employee get?
+documents:
+  - file: leave-policy-2023.md
+    date: 2023-01-15
+  - file: leave-policy-2025.md
+    date: 2025-03-01
+    replaces: [leave-policy-2023.md]
+  - file: leave-faq.md
+    date: 2025-06-10
+  - file: staff-handbook-extract.md
+    date: 2025-06-10
+  - file: sick-leave-memo-2022.md
+    date: 2022-05-02
+    replaces: [leave-policy-2025.md]
