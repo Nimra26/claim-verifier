@@ -14,6 +14,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 
 from verifier.config import VerifierSettings
+from verifier.documents import DocumentError
 from verifier.graph import build_graph
 from verifier.manifest import load_manifest
 from verifier.report import write_report
@@ -111,8 +112,11 @@ async def _run(args, reasoner, store, input_fn, *, ask=None, say=print) -> int:
         raise _Exit(2, f"Folder not found: {folder}")
     if not (folder / "manifest.yaml").is_file():
         raise _Exit(2, f"No manifest.yaml in {folder}")
+    say("Reading documents...")
     try:
         manifest, texts = load_manifest(folder)
+    except DocumentError as e:
+        raise _Exit(2, f"Could not read a document. {e}")
     except (FileNotFoundError, ValueError, KeyError) as e:
         raise _Exit(2, f"Could not read the manifest: {e}")
     answers = _load_answers(args.answers)

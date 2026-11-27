@@ -161,8 +161,8 @@
     </div>
     <div class="card">
       <h2><span class="n" style="background:var(--yellow)">2</span>Documents</h2>
-      <div class="drop" id="drop" tabindex="0">Drop <b>.md</b> or <b>.txt</b> files here, or <b>choose files</b>
-        <input type="file" id="files" accept=".md,.txt,text/plain,text/markdown" multiple hidden></div>
+      <div class="drop" id="drop" tabindex="0">Drop <b>PDF, Word, Excel, PowerPoint</b> or text files here, or <b>choose files</b>
+        <input type="file" id="files" accept=".pdf,.docx,.doc,.rtf,.odt,.xlsx,.xls,.ods,.pptx,.ppt,.odp,.md,.txt,.csv" multiple hidden></div>
       <div class="docs" id="docs"></div>
       <p class="muted" style="margin:10px 0 0">Add the date each document was issued if you know it: the newer one wins when two disagree. Tick “replaces” when a document says it replaces another.</p>
     </div>
@@ -243,7 +243,13 @@ async function health() {
 function showErr(id, msg) { $(id).textContent = msg || ""; $(id).classList.toggle("hidden", !msg); }
 
 // ---------- documents ----------
-function titleOf(text, name) { const m = text.match(/^#\s+(.+)$/m); return m ? m[1].trim() : name.replace(/\.(md|txt)$/i, ""); }
+const TEXT_EXT = /\.(md|txt|csv)$/i;
+const ANY_EXT = /\.(pdf|docx|doc|rtf|odt|xlsx|xls|ods|pptx|ppt|odp|md|txt|csv)$/i;
+const MAX_MB = 25;
+function titleOf(text, name) { const m = (text || "").match(/^#\s+(.+)$/m); return m ? m[1].trim() : name.replace(ANY_EXT, ""); }
+function toBase64(file) {
+  return new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1] || ""); r.onerror = () => fail(r.error); r.readAsDataURL(file); });
+}
 function guessDate(name, text) { const m = (name + " " + text.slice(0, 400)).match(/\b(20\d\d|19\d\d)-(\d\d)-(\d\d)\b/); return m ? m[0] : ""; }
 function renderDocs() {
   const box = $("docs"); box.replaceChildren();
@@ -272,14 +278,21 @@ function renderDocs() {
 }
 async function addFiles(list) {
   showErr("setupErr", "");
-  const skipped = [];
+  const skipped = [], big = [];
   for (const f of list) {
-    if (!/\.(md|txt)$/i.test(f.name)) { skipped.push(f.name); continue; }
-    const text = await f.text();
+    if (!ANY_EXT.test(f.name)) { skipped.push(f.name); continue; }
+    if (f.size > MAX_MB * 1048576) { big.push(f.name); continue; }
+    const isText = TEXT_EXT.test(f.name);
+    const text = isText ? await f.text() : "";
+    const data = isText ? null : await toBase64(f);
+    const fresh = { name: f.name, text, data, date: guessDate(f.name, text), replaces: [] };
     const existing = docs.find((d) => d.name === f.name);
-    if (existing) existing.text = text; else docs.push({ name: f.name, text, date: guessDate(f.name, text), replaces: [] });
+    if (existing) Object.assign(existing, { text, data }); else docs.push(fresh);
   }
-  if (skipped.length) showErr("setupErr", "Skipped (only .md and .txt can be checked): " + skipped.join(", "));
+  const problems = [];
+  if (skipped.length) problems.push("Skipped (this file type can't be read): " + skipped.join(", "));
+  if (big.length) problems.push(`Skipped (over ${MAX_MB} MB): ` + big.join(", "));
+  if (problems.length) showErr("setupErr", problems.join(" "));
   renderDocs();
 }
 const drop = $("drop");
@@ -302,7 +315,7 @@ $("run").onclick = async () => {
   showErr("setupErr", "");
   const problem = await health();
   if (problem) { showErr("setupErr", problem); return; }
-  const body = { question: $("question").value, documents: docs.map((d) => ({ name: d.name, text: d.text, date: d.date || null, replaces: d.replaces })) };
+  const body = { question: $("question").value, documents: docs.map((d) => ({ name: d.name, text: d.data ? null : d.text, data: d.data || null, date: d.date || null, replaces: d.replaces })) };
   $("run").disabled = true;
   try {
     const r = await fetch("/api/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -311,9 +324,9 @@ $("run").onclick = async () => {
     runId = data.id; showErr("runErr", ""); resetRunning(); show("running"); poll();
   } catch { showErr("setupErr", "The page lost contact with the checker. Is it still running?"); $("run").disabled = false; }
 };
-const STEPS = [["indexing", "Reading documents"], ["checking", "Checking claims"], ["waiting", "Your decision"], ["done", "Report"]];
+const STEPS = [["reading", "Reading documents"], ["indexing", "Indexing"], ["checking", "Checking claims"], ["waiting", "Your decision"], ["done", "Report"]];
 function renderSteps(status) {
-  const order = ["starting", "indexing", "checking", "waiting", "done"];
+  const order = ["starting", "reading", "indexing", "checking", "waiting", "done"];
   $("steps").replaceChildren(...STEPS.map(([key, words]) => {
     let cls = "stp";
     if (key === status) cls += " now"; else if (key !== "waiting" && order.indexOf(key) < order.indexOf(status)) cls += " done";

@@ -9,6 +9,13 @@ embedding client (`src/infrastructure/llm/openai_embeddings.py`) and the setting
 It is a copy, so fixes made in Ask the Workspace do not reach it automatically. Ask the Workspace is built on an
 MIT-licensed open-source base; its licence is kept in `LICENSE`.
 
+## Reading PDF, Word, Excel and PowerPoint files
+
+`src/modules/workspace/extract.py` (with the two `__init__.py` files above it) is Ask the Workspace's upload reader,
+copied unchanged from the same commit. `verifier/documents.py` calls it, and adds LibreOffice conversion for older
+and open formats (.doc, .rtf, .odt, .xls, .ods, .ppt, .odp). It needs `markitdown[docx,xlsx,pptx]` (MIT, Microsoft),
+pinned to 0.1.9 as in the app.
+
 ## The browser page's look
 
 `verifier/webui/static/` holds the Ask the Workspace page assets, copied unchanged so the Claim Verifier page looks

@@ -83,10 +83,22 @@ It is most useful when:
 - **Confidential documents.** The document text is sent to Claude (a cloud model). Use only made-up, public, or
   documents you are allowed to send outside the machine. No client data, no personal data.
 - **Opinion or judgement questions** ("Is this policy fair?"). It checks facts, not views.
-- **Scanned PDFs, Word files, images.** Only `.md` and `.txt` for now (no OCR). Convert to text first.
+- **Scanned PDFs and images.** There is no OCR: a PDF made of page pictures is refused. Use the original Word or text file.
 - **Urdu / Roman Urdu documents.** Not tuned or tested for them yet.
 - **Hundreds of documents.** Every claim is checked; large sets get slow and use a lot of model calls.
 - **As a final authority.** It shows you the evidence so a person can decide faster. Read the report.
+
+## File types
+
+| Type | Extensions | How it is read |
+|---|---|---|
+| Text | `.md` `.txt` `.csv` | as it is (UTF-8; Windows-1252 also accepted) |
+| PDF | `.pdf` | pdfplumber, the same reader as Ask the Workspace (scanned PDFs are refused: no OCR) |
+| Word, Excel, PowerPoint | `.docx` `.xlsx` `.pptx` | markitdown, as in Ask the Workspace; tables stay tables, Excel rows keep their column names |
+| Older and open formats | `.doc` `.rtf` `.odt` `.xls` `.ods` `.ppt` `.odp` | converted by LibreOffice first (must be installed), then read as above |
+
+Up to 25 MB per file (100 MB per check in the browser). Password-protected or damaged files are refused with a
+sentence saying what to do. Images (`.png`, `.jpg`) are not read.
 
 ## What you need
 
@@ -95,6 +107,7 @@ It is most useful when:
 | Linux or macOS with **Docker** | runs the document database and the search model | `docker ps` |
 | **uv** (Python package manager) | installs and runs the project (Python 3.12+) | `uv --version` |
 | **Claude Code**, installed and signed in | the reasoning model is reached through your Claude Code login — no API key needed | `claude --version` |
+| **LibreOffice** (optional) | reads older/open formats: .doc .rtf .odt .xls .ods .ppt .odp | `soffice --version` |
 | ~2 GB disk, ~3 GB free RAM | database + search model (bge-m3) | |
 
 Cost and time, measured on 5 short documents: about **1 minute** per run, about **half a cent per model call**
@@ -157,7 +170,8 @@ This opens **http://127.0.0.1:8765** (only this computer can reach it; `--port 9
 1. **Check the three dots at the top** — Database, Search model, Claude. Green means ready; hover a red one to see
    what to start.
 2. **Type your question.**
-3. **Add documents**: drop `.md` / `.txt` files on the box or click *choose files*. For each one you can set the
+3. **Add documents**: drop files on the box or click *choose files* (PDF, Word, Excel, PowerPoint, OpenDocument, RTF,
+   Markdown, CSV or plain text; up to 25 MB each — see [File types](#file-types)). For each one you can set the
    **date** it was issued (filled in automatically when the file name or first lines contain a date like
    `2025-03-01`) and tick which other documents it **replaces**. Remove one with ×.
    No documents at hand? Click **Try the example** to load the five Riverbend test documents.
@@ -186,8 +200,9 @@ my-check/
 └── faq.md
 ```
 
-- Files must be `.md` or `.txt`.
-- Start each file with a `# Title` line — the report uses it to name the document (otherwise the file name).
+- Files can be any type listed in [File types](#file-types).
+- For `.md` / `.txt`, start each file with a `# Title` line — the report uses it to name the document. Other files
+  are named by their first `# ` heading if they have one, otherwise by the file name (`Leave Policy 2025.pdf` → `Leave Policy 2025`).
 - The file name without extension becomes the document's id (`policy-2025`).
 
 ### 2. Write `manifest.yaml`
@@ -361,7 +376,9 @@ Last live result (27 Nov 2026, claude-sonnet-5-5 via Claude Code): both test set
 | Ollama connection error / exit 3 | Start `claim-verifier-ollama` (setup step 2); make sure `bge-m3` was pulled. |
 | `The Claude Code command (claude) was not found.` | Install Claude Code and sign in (`claude` once interactively). |
 | `Claude Code returned no …: Not logged in` in "Could not check" | Run `claude` and sign in, then run again. |
-| `unsupported file type (only .md and .txt)` | Convert the file to Markdown or plain text. |
+| `unsupported file type` | See [File types](#file-types); save the file as PDF or Word and add that. |
+| `Could not read a document. … is a scan` | The PDF is pictures of pages; use the original Word or text file. |
+| `… needs LibreOffice to read it` | Install LibreOffice (`sudo apt install libreoffice`), or save the file as .docx / .xlsx / .pptx. |
 | `manifest names a file that does not exist` | Check the file names in `manifest.yaml` match exactly. |
 | Page says “Another check is still running” | Wait for it, or answer/stop its question; restarting `verifier.web` also clears it. |
 | Port 55432 or 11434 already in use | Another container is running; stop it, or use different ports and set `VERIFIER_DATABASE_URL` / `VERIFIER_OLLAMA_URL`. |
@@ -398,7 +415,7 @@ Full design and decisions: [docs/design.md](docs/design.md). Build plan: [docs/p
 
 - Evidence from another document shows the start of the matching chunk, not the exact matching sentence. With short
   documents the quote starts at the title. Labels are unaffected.
-- Only `.md` / `.txt`; no page numbers for Markdown (evidence cites the passage and document instead).
+- No OCR: scanned PDFs are refused. Evidence names the document and passage, not the page number.
 - One run, one question: answers are not remembered between runs (use an answers file, or the browser page).
 - The browser page forgets running checks when it is restarted (finished reports stay in the runs folder).
 - Documents with the same file name in different folders share an id; re-running replaces the earlier copy in the
@@ -420,6 +437,7 @@ verifier/            the Claim Verifier
   search.py          evidence search over the indexed documents
   store.py           database setup and indexing
   manifest.py        reads manifest.yaml and the documents
+  documents.py       turns PDF / Word / Excel / PowerPoint / text files into text
   report.py          writes report.md / report.json
   acceptance.py      compares a report with an answer key
   probe_model.py     one live call per request type

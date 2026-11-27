@@ -87,8 +87,9 @@ def test_only_one_check_at_a_time_and_stop(client):
 @pytest.mark.parametrize("change, words", [
     ({"question": "  "}, "question"),
     ({"documents": []}, "at least one"),
-    ({"documents": [{"name": "../evil.md", "text": "x"}]}, "only .md and .txt"),
-    ({"documents": [{"name": "a.pdf", "text": "x"}]}, "only .md and .txt"),
+    ({"documents": [{"name": "../evil.md", "text": "x"}]}, "can't be checked"),
+    ({"documents": [{"name": "a.exe", "data": "TVo="}]}, "can't be checked"),
+    ({"documents": [{"name": "a.pdf", "data": "not base64!"}]}, "could not be uploaded"),
     ({"documents": [{"name": "a.md", "text": "   "}]}, "empty"),
     ({"documents": [{"name": "a.md", "text": "x", "date": "1 March"}]}, "2025-03-01"),
     ({"documents": [{"name": "a.md", "text": "x"}, {"name": "a.txt", "text": "y"}]}, "same name"),
@@ -98,6 +99,27 @@ def test_bad_input_is_refused_in_plain_words(client, change, words):
     r = client.post("/api/runs", json=body(**change))
     assert r.status_code == 422
     assert words in r.json()["detail"]
+
+
+def test_office_files_are_uploaded_and_read(client):
+    import base64
+
+    from verifier.tests.test_documents import _pptx
+
+    docs = [{"name": "faq.md", "text": TEXTS["faq"]},
+            {"name": "slides.pptx", "data": base64.b64encode(_pptx()).decode()}]
+    run_id = client.post("/api/runs", json=body(documents=docs)).json()["id"]
+    s = wait_for(client, run_id, {"done", "failed"})
+    assert s["status"] == "done", s
+
+
+def test_unreadable_upload_fails_in_plain_words(client):
+    import base64
+
+    docs = [{"name": "broken.docx", "data": base64.b64encode(b"not a word file").decode()}]
+    run_id = client.post("/api/runs", json=body(documents=docs)).json()["id"]
+    s = wait_for(client, run_id, {"done", "failed"})
+    assert s["status"] == "failed" and "broken.docx" in s["message"]
 
 
 def test_unknown_run_and_answer_when_not_waiting(client):

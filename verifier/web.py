@@ -13,6 +13,8 @@ import verifier.appenv  # noqa: F401  - must run before any src import (see veri
 
 import argparse
 import asyncio
+import base64
+import binascii
 import datetime as dt
 import json
 import os
@@ -38,6 +40,7 @@ from pydantic import BaseModel
 
 from verifier.__main__ import _Exit, _is_connection_error, _run
 from verifier.config import VerifierSettings
+from verifier.documents import MAX_BYTES, SUPPORTED
 from verifier.models import Report
 from verifier.report import report_view
 
@@ -45,14 +48,17 @@ PAGE = Path(__file__).with_name("webui") / "index.html"
 STATIC = Path(__file__).with_name("webui") / "static"  # fonts, logo, header theme: copied from Ask the Workspace
 EXAMPLE = Path(__file__).with_name("testsets") / "leave-policy"
 MAX_DOCS = 30
-MAX_DOC_BYTES = 1_000_000
-SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._()-]{0,120}\.(md|txt)$", re.IGNORECASE)
-ACTIVE = {"starting", "indexing", "checking", "waiting"}
+MAX_DOC_BYTES = MAX_BYTES  # 25 MB per file
+MAX_TOTAL_BYTES = 100 * 1024 * 1024
+_EXTS = "|".join(sorted(e.lstrip(".") for e in SUPPORTED))
+SAFE_NAME = re.compile(rf"^[A-Za-z0-9][A-Za-z0-9 ._()-]{{0,120}}\.({_EXTS})$", re.IGNORECASE)
+ACTIVE = {"starting", "reading", "indexing", "checking", "waiting"}
 
 
 class DocIn(BaseModel):
     name: str
-    text: str
+    text: str | None = None  # .md / .txt / .csv as text
+    data: str | None = None  # any other file, base64
     date: str | None = None
     replaces: list[str] = []
 
@@ -74,7 +80,7 @@ class _Cancelled(Exception):
 class RunState:
     id: str
     folder: Path
-    status: str = "starting"  # starting, indexing, checking, waiting, done, failed, cancelled
+    status: str = "starting"  # starting, reading, indexing, checking, waiting, done, failed, cancelled
     message: str = ""
     question: dict | None = None
     view: dict | None = None
@@ -106,13 +112,21 @@ def _validate(body: RunIn) -> None:
     stems = [Path(n).stem.lower() for n in names]
     if len(set(stems)) != len(stems):
         bad("Two documents have the same name with a different ending (.md / .txt). Rename one.")
+    total = 0
     for d in body.documents:
         if not SAFE_NAME.match(d.name):
-            bad(f"“{d.name}”: only .md and .txt files with plain names can be checked.")
-        if not d.text.strip():
+            bad(f"“{d.name}”: this file can't be checked. Use PDF, Word, Excel, PowerPoint, OpenDocument, RTF, "
+                "Markdown, CSV or plain text, with a plain file name.")
+        raw = _content(d)
+        if raw is None:
+            bad(f"“{d.name}” could not be uploaded. Add it again.")
+        if not raw.strip():
             bad(f"“{d.name}” is empty.")
-        if len(d.text.encode("utf-8")) > MAX_DOC_BYTES:
-            bad(f"“{d.name}” is too large (limit 1 MB of text).")
+        if len(raw) > MAX_DOC_BYTES:
+            bad(f"“{d.name}” is too large (limit {MAX_DOC_BYTES // 1048576} MB).")
+        total += len(raw)
+        if total > MAX_TOTAL_BYTES:
+            bad(f"The documents add up to more than {MAX_TOTAL_BYTES // 1048576} MB. Check fewer at a time.")
         if d.date:
             try:
                 dt.date.fromisoformat(d.date)
@@ -123,11 +137,21 @@ def _validate(body: RunIn) -> None:
                 bad(f"“{d.name}” replaces “{r}”, which is not another document in this check.")
 
 
+def _content(d: DocIn) -> bytes | None:
+    """The file's bytes: `text` as UTF-8, or `data` decoded from base64 (None when that is not valid base64)."""
+    if d.data is not None:
+        try:
+            return base64.b64decode(d.data, validate=True)
+        except (binascii.Error, ValueError):
+            return None
+    return (d.text or "").encode("utf-8")
+
+
 def _write_folder(body: RunIn, folder: Path) -> None:
     folder.mkdir(parents=True, exist_ok=False)
     docs = []
     for d in body.documents:
-        (folder / d.name).write_text(d.text, encoding="utf-8")
+        (folder / d.name).write_bytes(_content(d))
         entry: dict = {"file": d.name}
         if d.date:
             entry["date"] = d.date
@@ -182,7 +206,9 @@ def create_app(*, reasoner_factory=None, store_factory=None) -> FastAPI:
 
     def worker(state: RunState) -> None:
         def say(line: str) -> None:
-            if line.startswith("Indexing"):
+            if line.startswith("Reading"):
+                state.status = "reading"
+            elif line.startswith("Indexing"):
                 state.status = "indexing"
             elif line.startswith("Checking"):
                 state.status = "checking"

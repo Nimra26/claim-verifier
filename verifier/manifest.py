@@ -4,6 +4,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel
 
+from verifier.documents import read_file, supported
 from verifier.models import DocumentInfo
 
 
@@ -27,11 +28,12 @@ def load_manifest(folder: Path) -> tuple[Manifest, dict[str, str]]:
     for entry in raw.get("documents", []):
         name = entry["file"]
         path = folder / name
-        if path.suffix.lower() not in (".md", ".txt"):
-            raise ValueError(f"unsupported file type (only .md and .txt): {name}")
+        if not supported(name):
+            raise ValueError(f"unsupported file type: {name} (use PDF, Word, Excel, PowerPoint, OpenDocument, RTF, "
+                             f"Markdown, CSV or plain text)")
         if not path.is_file():
             raise FileNotFoundError(f"manifest names a file that does not exist: {name}")
-        text = path.read_text(encoding="utf-8")
+        text = read_file(path)
         d = entry.get("date")
         if isinstance(d, str):
             d = date.fromisoformat(d)
