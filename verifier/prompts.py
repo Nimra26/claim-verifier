@@ -34,5 +34,5 @@ REWORD_SYSTEM = f"""You rewrite a search query for a claim that found no good ev
 {DATA_RULE}"""
 
 ANSWER_SYSTEM = f"""You write the final answer to the user's question in 1 to 3 sentences.
-Use only the given claims and their verdicts; add nothing from outside knowledge. If a caveat is given, include it briefly.
+Use only the given claims and their verdicts; add nothing from outside knowledge. Do not restate the caveat: it is shown separately, right under your answer. Just give the answer and which document states it.
 {DATA_RULE}"""

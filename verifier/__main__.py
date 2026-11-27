@@ -104,7 +104,8 @@ def _answer(question: dict, answers: dict[str, str], input_fn, unattended: bool 
     return choices[-1]
 
 
-async def _run(args, reasoner, store, input_fn) -> int:
+async def _run(args, reasoner, store, input_fn, *, ask=None, say=print) -> int:
+    """`ask(question) -> choice` replaces the terminal prompt (used by the web page); `say` receives progress lines."""
     folder = Path(args.folder)
     if not folder.is_dir():
         raise _Exit(2, f"Folder not found: {folder}")
@@ -141,7 +142,7 @@ async def _run(args, reasoner, store, input_fn) -> int:
                     raise _Exit(3, DB_DOWN)
                 raise
         titles = {d.id: d.title for d in manifest.documents}
-        print(f"Indexing {len(texts)} documents...")
+        say(f"Indexing {len(texts)} documents...")
         try:
             await index_documents(store, texts, titles)
         except Exception as e:
@@ -155,23 +156,23 @@ async def _run(args, reasoner, store, input_fn) -> int:
         config = {"configurable": {"thread_id": str(uuid.uuid4())}}
         payload = {"question": manifest.question,
                    "documents": {d.id: d for d in manifest.documents}, "texts": texts}
-        print("Checking claims...")
+        say("Checking claims...")
         result = await graph.ainvoke(payload, config)
         while result.get("__interrupt__"):
             question = result["__interrupt__"][0].value
             result = await graph.ainvoke(
-                Command(resume=_answer(question, answers, input_fn, args.unattended)), config)
+                Command(resume=ask(question) if ask else _answer(question, answers, input_fn, args.unattended)), config)
         for line in result["report"].failures:
-            print(f"Note: {line}")
+            say(f"Note: {line}")
         report = result["report"]
         try:
             md_path, json_path = write_report(report, folder)
         except OSError:
             raise _Exit(2, f"Could not write the report to {folder}")
-        print(f"Report written: {md_path}")
-        print(f"Report written: {json_path}")
+        say(f"Report written: {md_path}")
+        say(f"Report written: {json_path}")
         if not report.completed:
-            print(report.answer.text)
+            say(report.answer.text)
             return 4
         return 0
     finally:

@@ -60,6 +60,17 @@ def _source(doc) -> str:
     return f"{doc.title}, {doc.date}" if doc.date else doc.title
 
 
+def _answer_text(report: Report) -> tuple[str, str | None]:
+    """The answer's headline and, for "not enough evidence", the reason why."""
+    ans = report.answer
+    if ans.status == "answered" or not report.completed:
+        return ans.text, None
+    verdicts = {v.claim_id: v for v in report.verdicts}
+    if answer_blockers(report.claims, verdicts):
+        return "Not enough evidence to answer.", "The documents disagree and nothing settled which one is right."
+    return "Not enough evidence to answer.", "No checked statement in the documents answers this question."
+
+
 def render_markdown(report: Report) -> str:
     titles = {d.id: d.title for d in report.documents}
     docs = {d.id: d for d in report.documents}
@@ -67,18 +78,10 @@ def render_markdown(report: Report) -> str:
     out = [f"# {report.question}", "", "## Answer", ""]
 
     ans = report.answer
-    if ans.status == "answered":
-        out.append(ans.text)
-    elif not report.completed:
-        out.append(ans.text)
-    else:
-        out.append("Not enough evidence to answer.")
-        out.append("")
-        verdicts = {v.claim_id: v for v in report.verdicts}
-        if answer_blockers(report.claims, verdicts):
-            out.append("The documents disagree and nothing settled which one is right.")
-        else:
-            out.append("No checked statement in the documents answers this question.")
+    headline, detail = _answer_text(report)
+    out.append(headline)
+    if detail:
+        out += ["", detail]
     if ans.caveat:
         out += ["", f"*{ans.caveat}*"]
 
@@ -125,6 +128,45 @@ def render_markdown(report: Report) -> str:
     parts = [f"{LABEL_WORDS[k]}: {counts.get(k, 0)}" for k in LABEL_WORDS]
     out += ["", "---", "", " · ".join(parts) + f" · Dropped as not factual: {report.dropped_non_factual}", ""]
     return "\n".join(out)
+
+
+def report_view(report: Report) -> dict:
+    """The report as plain data for the web page: same wording as report.md."""
+    titles = {d.id: d.title for d in report.documents}
+    docs = {d.id: d for d in report.documents}
+    claims = {c.id: c for c in report.claims}
+    headline, detail = _answer_text(report)
+    rows, contradictions = [], []
+    for v in report.verdicts:
+        c = claims.get(v.claim_id)
+        if c is None:
+            continue
+        rows.append({
+            "id": c.id, "text": c.text, "label": v.label, "label_words": LABEL_WORDS[v.label], "why": v.reason,
+            "source": _source(docs.get(c.doc_id)), "evidence": _evidence_cell(report, v, c, titles),
+            "low_confidence": _low_confidence(report, v), "important": c.important,
+            "settled_by_person": v.settled_by_person,
+        })
+        if v.label in ("contradicted", "outdated"):
+            contradictions.append({
+                "label": v.label, "label_words": LABEL_WORDS[v.label], "text": c.text,
+                "this_side": f"“{' '.join(c.quote.split())}” ({_source(docs.get(c.doc_id))})",
+                "other_side": _evidence(report, v, titles),
+                "replaced": f"It replaced {v.beat_doc_title}'s figure." if v.beat_doc_title else None,
+            })
+    counts = Counter(v.label for v in report.verdicts)
+    return {
+        "question": report.question,
+        "answer": {"status": report.answer.status, "headline": headline, "detail": detail,
+                   "caveat": report.answer.caveat, "completed": report.completed},
+        "documents": [{"title": d.title, "file": d.file, "date": str(d.date) if d.date else None} for d in report.documents],
+        "claims": rows,
+        "contradictions": contradictions,
+        "settled": [{"question": q.text, "answer": report.person_answers.get(q.id, "")} for q in report.asked],
+        "failures": list(report.failures),
+        "counts": [{"label": k, "words": w, "n": counts.get(k, 0)} for k, w in LABEL_WORDS.items()],
+        "dropped_non_factual": report.dropped_non_factual,
+    }
 
 
 def write_report(report: Report, folder: Path) -> tuple[Path, Path]:

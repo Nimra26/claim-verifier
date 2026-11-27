@@ -13,7 +13,8 @@ The Claim Verifier checks the documents against each other before anyone trusts 
 - [Where you should not use it](#where-you-should-not-use-it)
 - [What you need](#what-you-need)
 - [Setup (once per machine)](#setup-once-per-machine)
-- [Using it, step by step](#using-it-step-by-step)
+- [Using it in your browser](#using-it-in-your-browser)
+- [Using it from the terminal, step by step](#using-it-from-the-terminal-step-by-step)
 - [Reading the report](#reading-the-report)
 - [Answering questions in advance and unattended runs](#answering-questions-in-advance-and-unattended-runs)
 - [Settings](#settings)
@@ -124,7 +125,13 @@ docker run -d --name claim-verifier-ollama --restart no \
 docker exec claim-verifier-ollama ollama pull bge-m3
 ```
 
-Try it on the included example:
+Try it on the included example — in your browser:
+
+```bash
+uv run python -m verifier.web          # opens http://127.0.0.1:8765, then click "Try the example" → "Run check"
+```
+
+or in the terminal:
 
 ```bash
 uv run python -m verifier run verifier/testsets/leave-policy
@@ -138,7 +145,36 @@ docker rm -f claim-verifier-db claim-verifier-ollama   # the model volume stays
 
 Next time, run only steps 1 and 2 (no download).
 
-## Using it, step by step
+## Using it in your browser
+
+```bash
+uv run python -m verifier.web
+```
+
+This opens **http://127.0.0.1:8765** (only this computer can reach it; `--port 9000` to change the port,
+`--no-browser` to not open a tab). Stop it with Ctrl+C.
+
+1. **Check the three dots at the top** — Database, Search model, Claude. Green means ready; hover a red one to see
+   what to start.
+2. **Type your question.**
+3. **Add documents**: drop `.md` / `.txt` files on the box or click *choose files*. For each one you can set the
+   **date** it was issued (filled in automatically when the file name or first lines contain a date like
+   `2025-03-01`) and tick which other documents it **replaces**. Remove one with ×.
+   No documents at hand? Click **Try the example** to load the five Riverbend test documents.
+4. Click **Run check**. The steps show *Reading documents → Checking claims → Your decision → Report*
+   (about a minute for a few short documents).
+5. If it needs a decision, a blue box asks the question with one button per choice. The check waits until you click
+   one (or **Stop the check**).
+6. **Read the report**: the answer on top (with its caveat in yellow, or *Not enough evidence to answer*), the
+   claims with coloured labels — click a label at the top to show only those — each claim's reason and
+   **Evidence** (click to open), the contradictions side by side, and what you settled.
+   **Download report (.md)** and **Download data (.json)** save it; **Change and run again** keeps your documents.
+
+One check runs at a time. Each check is saved in `~/.claim-verifier/runs/<date-time-id>/` (its documents,
+`manifest.yaml`, `report.md`, `report.json`); set `VERIFIER_RUNS_DIR` to save elsewhere. That folder can also be
+re-run from the terminal: `uv run python -m verifier run ~/.claim-verifier/runs/<id>`.
+
+## Using it from the terminal, step by step
 
 ### 1. Make a folder with your documents
 
@@ -296,7 +332,7 @@ stale key cannot override your login.
 ## Checking that it still works
 
 ```bash
-# Unit tests (offline, no containers, no model): 117 tests
+# Unit tests (offline, no containers, no model): 129 tests
 uv run pytest -q -p no:cacheprovider verifier/tests
 
 # One tiny live call per request type (a few cents)
@@ -327,6 +363,7 @@ Last live result (27 Nov 2026, claude-sonnet-5-5 via Claude Code): both test set
 | `Claude Code returned no …: Not logged in` in "Could not check" | Run `claude` and sign in, then run again. |
 | `unsupported file type (only .md and .txt)` | Convert the file to Markdown or plain text. |
 | `manifest names a file that does not exist` | Check the file names in `manifest.yaml` match exactly. |
+| Page says “Another check is still running” | Wait for it, or answer/stop its question; restarting `verifier.web` also clears it. |
 | Port 55432 or 11434 already in use | Another container is running; stop it, or use different ports and set `VERIFIER_DATABASE_URL` / `VERIFIER_OLLAMA_URL`. |
 | Everything is "No evidence" | Look at "Could not check" in the report — usually model calls failed. |
 
@@ -362,7 +399,8 @@ Full design and decisions: [docs/design.md](docs/design.md). Build plan: [docs/p
 - Evidence from another document shows the start of the matching chunk, not the exact matching sentence. With short
   documents the quote starts at the title. Labels are unaffected.
 - Only `.md` / `.txt`; no page numbers for Markdown (evidence cites the passage and document instead).
-- One run, one question, one terminal session: answers are not remembered between runs (use an answers file).
+- One run, one question: answers are not remembered between runs (use an answers file, or the browser page).
+- The browser page forgets running checks when it is restarted (finished reports stay in the runs folder).
 - Documents with the same file name in different folders share an id; re-running replaces the earlier copy in the
   database. Run one folder at a time.
 - English only so far.
@@ -372,6 +410,8 @@ Full design and decisions: [docs/design.md](docs/design.md). Build plan: [docs/p
 ```
 verifier/            the Claim Verifier
   __main__.py        command line: python -m verifier run <folder>
+  web.py             browser page: python -m verifier.web
+  webui/index.html   the page itself (no outside scripts; works offline)
   graph.py           the LangGraph graph
   rules.py           labelling, outdated rule, when to ask a person, which claim answers
   reasoner.py        Claude calls (Claude Code login or API) and their schemas
@@ -382,7 +422,7 @@ verifier/            the Claim Verifier
   report.py          writes report.md / report.json
   acceptance.py      compares a report with an answer key
   probe_model.py     one live call per request type
-  tests/             117 offline tests (fake model, fake search)
+  tests/             129 offline tests (fake model, fake search)
   testsets/          leave-policy and no-answer example sets with answer keys
 src/                 retrieval code copied from Ask the Workspace (see NOTICE.md)
 docs/                design and build plan
