@@ -1,7 +1,8 @@
 """Live check: one tiny Claude call per output schema. Costs a few cents; not run by the tests.
 
 Usage: uv run python -m verifier.probe_model
-VERIFIER_BACKEND=cli (default) uses the local Claude Code login; =api needs ANTHROPIC_API_KEY (never printed).\nModel: VERIFIER_MODEL (default claude-sonnet-5-5).
+VERIFIER_BACKEND=local (default) uses VERIFIER_LOCAL_MODEL (qwen3.5:4b) in Ollama; =cli uses the Claude Code login;
+=api needs ANTHROPIC_API_KEY (never printed). Claude model: VERIFIER_MODEL (default claude-sonnet-5-5).
 """
 from __future__ import annotations
 
@@ -25,11 +26,11 @@ PASSAGE = Passage(id="old:0", doc_id="old", source="Leave Policy 2023",
 async def main() -> int:
     settings = VerifierSettings()
     try:
-        r = make_reasoner(settings.backend, settings.model)
+        r = make_reasoner(settings.backend, settings.model_for(settings.backend), ollama_url=settings.ollama_url)
     except RuntimeError as e:
         print(e)
         return 2
-    model = settings.model
+    model = settings.model_for(settings.backend)
     print(f"model: {model} via {settings.backend}")
     probes = {
         "DocFacts": lambda: r.doc_facts("Leave Policy 2025", TEXT, {"old": "Leave Policy 2023"}),

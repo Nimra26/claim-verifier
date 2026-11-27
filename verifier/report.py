@@ -84,6 +84,8 @@ def render_markdown(report: Report) -> str:
         out += ["", detail]
     if ans.caveat:
         out += ["", f"*{ans.caveat}*"]
+    if report.checked_with:
+        out += ["", f"Checked with {report.checked_with}."]
 
     out += ["", "## Claims", "", "| Claim | Label | Why | Source | Evidence |", "| --- | --- | --- | --- | --- |"]
     for v in report.verdicts:
@@ -157,6 +159,7 @@ def report_view(report: Report) -> dict:
     counts = Counter(v.label for v in report.verdicts)
     return {
         "question": report.question,
+        "checked_with": report.checked_with,
         "answer": {"status": report.answer.status, "headline": headline, "detail": detail,
                    "caveat": report.answer.caveat, "completed": report.completed},
         "documents": [{"title": d.title, "file": d.file, "date": str(d.date) if d.date else None} for d in report.documents],

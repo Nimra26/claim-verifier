@@ -42,6 +42,7 @@ from verifier.__main__ import _Exit, _is_connection_error, _run
 from verifier.config import VerifierSettings
 from verifier.documents import MAX_BYTES, SUPPORTED
 from verifier.models import Report
+from verifier.reasoner import normalize_backend
 from verifier.report import report_view
 
 PAGE = Path(__file__).with_name("webui") / "index.html"
@@ -66,6 +67,7 @@ class DocIn(BaseModel):
 class RunIn(BaseModel):
     question: str
     documents: list[DocIn]
+    backend: str | None = None  # "local" (Ollama on this computer) or "claude"; None: VERIFIER_BACKEND
 
 
 class AnswerIn(BaseModel):
@@ -80,15 +82,17 @@ class _Cancelled(Exception):
 class RunState:
     id: str
     folder: Path
+    backend: str | None = None
     status: str = "starting"  # starting, reading, indexing, checking, waiting, done, failed, cancelled
     message: str = ""
     question: dict | None = None
+    reasoning: str | None = None  # "qwen3.5:4b, on this computer (Ollama)"
     view: dict | None = None
     started: float = field(default_factory=time.time)
     answers: queue.Queue = field(default_factory=queue.Queue)
 
     def public(self) -> dict:
-        return {"id": self.id, "status": self.status, "message": self.message, "question": self.question,
+        return {"id": self.id, "backend": self.backend, "reasoning": self.reasoning, "status": self.status, "message": self.message, "question": self.question,
                 "report": self.view, "elapsed": round(time.time() - self.started)}
 
 
@@ -100,6 +104,8 @@ def _validate(body: RunIn) -> None:
     def bad(msg: str):
         raise HTTPException(status_code=422, detail=msg)
 
+    if body.backend is not None and body.backend not in ("local", "claude", "api"):
+        bad("Choose where the reasoning runs: local or claude.")
     if not body.question.strip():
         bad("Type a question first.")
     if not body.documents:
@@ -187,12 +193,22 @@ def _health(settings: VerifierSettings) -> dict:
         claude = bool(os.environ.get("ANTHROPIC_API_KEY"))
     else:
         claude = shutil.which("claude") is not None
+    local = False
+    if ollama:
+        from verifier.reasoner import local_model_ready
+
+        local = bool(local_model_ready(settings.ollama_url, settings.local_model))
     return {
+        "default_backend": "local" if normalize_backend(settings.backend) == "local" else "claude",
+        "local": {"ok": local, "model": settings.local_model,
+                  "help": ("Start Ollama (see README, Setup step 2)." if not ollama else
+                           f"Download the local model once: docker exec claim-verifier-ollama ollama pull "
+                           f"{settings.local_model}")},
         "database": {"ok": db, "help": "Start the document database (see README, Setup step 1)."},
         "search": {"ok": ollama and model,
                    "help": ("Start Ollama (see README, Setup step 2)." if not ollama
                             else f"Download the search model: docker exec claim-verifier-ollama ollama pull {settings.embed_model}")},
-        "claude": {"ok": claude, "help": ("Set ANTHROPIC_API_KEY." if settings.backend == "api"
+        "claude": {"ok": claude, "model": settings.model, "help": ("Set ANTHROPIC_API_KEY." if settings.backend == "api"
                                           else "Install Claude Code and sign in (run: claude).")},
     }
 
@@ -212,6 +228,8 @@ def create_app(*, reasoner_factory=None, store_factory=None) -> FastAPI:
                 state.status = "indexing"
             elif line.startswith("Checking"):
                 state.status = "checking"
+            elif line.startswith("Reasoning with"):
+                state.reasoning = line.removeprefix("Reasoning with ")
             elif not line.startswith("Report written"):
                 state.message = line
 
@@ -225,7 +243,7 @@ def create_app(*, reasoner_factory=None, store_factory=None) -> FastAPI:
             state.status = "checking"
             return choice
 
-        args = SimpleNamespace(folder=str(state.folder), answers=None, unattended=False)
+        args = SimpleNamespace(folder=str(state.folder), answers=None, unattended=False, backend=state.backend)
         reasoner = reasoner_factory() if reasoner_factory else None
         store = store_factory() if store_factory else None
         try:
@@ -269,7 +287,7 @@ def create_app(*, reasoner_factory=None, store_factory=None) -> FastAPI:
             if any(r.status in ACTIVE for r in runs.values()):
                 raise HTTPException(status_code=409, detail="Another check is still running. Wait for it or stop it.")
             run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6]
-            state = RunState(id=run_id, folder=_runs_dir() / run_id)
+            state = RunState(id=run_id, folder=_runs_dir() / run_id, backend=body.backend)
             _write_folder(body, state.folder)
             runs[run_id] = state
         threading.Thread(target=worker, args=(state,), daemon=True, name=f"check-{run_id}").start()

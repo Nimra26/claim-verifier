@@ -122,6 +122,19 @@ def test_unreadable_upload_fails_in_plain_words(client):
     assert s["status"] == "failed" and "broken.docx" in s["message"]
 
 
+def test_backend_choice_is_kept_and_checked(client):
+    assert client.post("/api/runs", json=body(backend="somewhere")).status_code == 422
+    r = client.post("/api/runs", json=body(backend="local"))
+    assert r.status_code == 200 and r.json()["backend"] == "local"
+    client.post(f"/api/runs/{r.json()['id']}/cancel")
+
+
+def test_health_reports_both_backends(client):
+    h = client.get("/api/health").json()
+    assert h["default_backend"] in ("local", "claude")
+    assert {"ok", "model", "help"} <= set(h["local"]) and {"ok", "model", "help"} <= set(h["claude"])
+
+
 def test_unknown_run_and_answer_when_not_waiting(client):
     assert client.get("/api/runs/nope").status_code == 404
     run_id = client.post("/api/runs", json=body(documents=[{"name": "faq.md", "text": TEXTS["faq"]}])).json()["id"]

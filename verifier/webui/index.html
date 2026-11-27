@@ -41,6 +41,15 @@
   textarea { min-height: 76px; resize: vertical; line-height: 1.5; }
   textarea:focus, input[type=date]:focus { outline: 2px solid var(--blue-100); border-color: var(--blue); }
 
+  .where { display: grid; gap: 8px; }
+  .opt { display: grid; grid-template-columns: 18px 1fr; gap: 4px 10px; align-items: start; border: 1.5px solid var(--line); border-radius: 12px; padding: 11px 12px; cursor: pointer; font-size: 13px; color: var(--ink-2); }
+  .opt input { margin: 3px 0 0; accent-color: var(--blue); }
+  .opt b { color: var(--ink); font-size: 14px; }
+  .opt .sub { grid-column: 2; }
+  .opt .st { grid-column: 2; font-size: 12px; font-weight: 600; }
+  .opt .st.ok { color: var(--green-700); } .opt .st.bad { color: var(--error-700); }
+  .opt:has(input:checked) { border-color: var(--blue); background: var(--blue-50); }
+  .checked-with { margin-top: 10px; font-size: 12px; color: var(--ink-2); }
   .drop { border: 1.5px dashed var(--blue-100); background: var(--blue-50); border-radius: 12px; padding: 16px 12px; text-align: center; color: var(--ink-2); font-size: 13px; cursor: pointer; transition: border-color .12s, background .12s; }
   .drop:hover, .drop.over { border-color: var(--blue); background: #E4EBFA; }
   .drop b { color: var(--blue-600); }
@@ -166,10 +175,23 @@
       <div class="docs" id="docs"></div>
       <p class="muted" style="margin:10px 0 0">Add the date each document was issued if you know it: the newer one wins when two disagree. Tick “replaces” when a document says it replaces another.</p>
     </div>
+    <div class="card">
+      <h2><span class="n" style="background:var(--green)">3</span>Where the reasoning runs</h2>
+      <div class="where" role="radiogroup" aria-label="Where the reasoning runs">
+        <label class="opt"><input type="radio" name="backend" value="local">
+          <b>On this computer (private)</b>
+          <span class="sub">Nothing leaves this computer. Slower (minutes per check) and less accurate. Model: <span id="localModel">qwen3.5:4b</span>.</span>
+          <span class="st" id="localSt"></span></label>
+        <label class="opt"><input type="radio" name="backend" value="claude">
+          <b>Claude (cloud)</b>
+          <span class="sub">About a minute per check and more accurate, but document text is sent to Anthropic.</span>
+          <span class="st" id="claudeSt"></span></label>
+      </div>
+    </div>
     <div class="runrow">
       <button class="btn primary" id="run">Run check</button>
       <div class="banner err hidden" id="setupErr"></div>
-      <p class="muted" style="margin:0">Document text is sent to Claude. Use made-up or public documents only.</p>
+      <p class="muted" style="margin:0" id="privacyNote"></p>
     </div>
   </aside>
 
@@ -228,16 +250,39 @@ let docs = [];          // {name, text, date, replaces:[]}
 let runId = null, timer = null, filters = new Set();
 
 // ---------- service status (header pills, as on the Ask page) ----------
+let backendPicked = false;
+function backend() { const r = document.querySelector('input[name="backend"]:checked'); return r ? r.value : "local"; }
+function privacyNote() {
+  $("privacyNote").textContent = backend() === "local"
+    ? "Private: documents are read, searched and checked on this computer only."
+    : "Document text is sent to Claude (Anthropic). Use only documents you are allowed to share.";
+}
+document.querySelectorAll('input[name="backend"]').forEach((r) => r.onchange = () => {
+  backendPicked = true; privacyNote(); try { localStorage.setItem("cv-backend", backend()); } catch {}
+});
 async function health() {
   try {
     const h = await (await fetch("/api/health")).json();
-    const names = { database: "Database", search: "Search model", claude: "Claude" };
+    if (!backendPicked) {
+      let saved = null; try { saved = localStorage.getItem("cv-backend"); } catch {}
+      const want = saved === "local" || saved === "claude" ? saved : h.default_backend;
+      document.querySelector(`input[name="backend"][value="${want}"]`).checked = true; backendPicked = true; privacyNote();
+    }
+    $("localModel").textContent = h.local.model;
+    for (const [k, id] of [["local", "localSt"], ["claude", "claudeSt"]]) {
+      $(id).className = "st " + (h[k].ok ? "ok" : "bad");
+      $(id).textContent = h[k].ok ? "Ready" : "Not ready: " + h[k].help;
+    }
+    const names = { database: "Database", search: "Search model", local: "Local model", claude: "Claude" };
+    const needed = ["database", "search", backend()];
     const box = $("pills"); box.replaceChildren();
-    for (const [k, v] of Object.entries(h)) {
+    for (const k of needed) {
+      const v = h[k];
       const p = el("span", "pill " + (v.ok ? "ok" : "bad")); p.append(el("i"), document.createTextNode(names[k] + (v.ok ? "" : ": not ready")));
       p.title = v.ok ? "Ready" : v.help; box.append(p);
     }
-    return Object.values(h).every((v) => v.ok) ? null : Object.values(h).filter((v) => !v.ok).map((v) => v.help).join(" ");
+    const bad = needed.filter((k) => !h[k].ok).map((k) => h[k].help);
+    return bad.length ? bad.join(" ") : null;
   } catch { return "The page lost contact with the checker. Is it still running?"; }
 }
 function showErr(id, msg) { $(id).textContent = msg || ""; $(id).classList.toggle("hidden", !msg); }
@@ -315,7 +360,7 @@ $("run").onclick = async () => {
   showErr("setupErr", "");
   const problem = await health();
   if (problem) { showErr("setupErr", problem); return; }
-  const body = { question: $("question").value, documents: docs.map((d) => ({ name: d.name, text: d.data ? null : d.text, data: d.data || null, date: d.date || null, replaces: d.replaces })) };
+  const body = { question: $("question").value, documents: docs.map((d) => ({ name: d.name, text: d.data ? null : d.text, data: d.data || null, date: d.date || null, replaces: d.replaces })), backend: backend() };
   $("run").disabled = true;
   try {
     const r = await fetch("/api/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -381,6 +426,7 @@ function renderReport(r) {
   a.append(head, el("div", "text", r.answer.headline));
   if (r.answer.detail) a.append(el("div", "detail", r.answer.detail));
   if (r.answer.caveat) a.append(el("div", "note", r.answer.caveat));
+  if (r.checked_with) a.append(el("div", "checked-with", "Checked with " + r.checked_with + "."));
   const foot = el("div", "afoot");
   const md = el("a", "btn", "Download report (.md)"); md.href = `/api/runs/${runId}/report.md`; md.download = "";
   const js = el("a", "btn", "Download data (.json)"); js.href = `/api/runs/${runId}/report.json`; js.download = "";

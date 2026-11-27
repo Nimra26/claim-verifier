@@ -242,8 +242,94 @@ class ClaudeCodeReasoner(ClaudeReasoner):
         shutil.rmtree(self._cwd, ignore_errors=True)
 
 
-def make_reasoner(backend: str, model: str) -> ClaudeReasoner:
-    """backend "cli": the local Claude Code login (no API key). backend "api": ANTHROPIC_API_KEY."""
+class OllamaReasoner(ClaudeReasoner):
+    """Same prompts and schemas, answered by a model running in the local Ollama (as Ask the Workspace does with
+    qwen3.5:4b). Nothing leaves the machine. Ollama's structured output (`format` = JSON schema) keeps the replies
+    in the same shape; a reply that still doesn't fit is asked for once more before it counts as a failure."""
+
+    def __init__(self, model: str, *, url: str = "http://localhost:11434", max_parallel: int = 1,
+                 timeout: float = 900.0, context: int = 16384, client=None):
+        super().__init__(model)
+        self.url = url.rstrip("/")
+        self.timeout = timeout
+        self.context = context
+        self._http = client
+        self._slots = asyncio.Semaphore(max_parallel)  # one at a time: on a laptop CPU, parallel calls only queue
+
+    def _client_http(self):
+        if self._http is None:
+            import httpx
+
+            self._http = httpx.AsyncClient(timeout=self.timeout)
+        return self._http
+
+    async def _call(self, schema: type[BaseModel], system: str, user: str):
+        body = {
+            "model": self.model, "stream": False, "think": False,
+            "format": schema.model_json_schema(),
+            "options": {"temperature": 0, "num_ctx": self.context},
+            "messages": [{"role": "system", "content": system + "\n\nReply with JSON only."},
+                         {"role": "user", "content": user}],
+        }
+        last = ""
+        for _ in range(2):
+            async with self._slots:
+                try:
+                    r = await self._client_http().post(self.url + "/api/chat", json=body)
+                except Exception as e:  # noqa: BLE001 - re-raised as plain words below unless it is a network error
+                    if type(e).__name__ in {"ConnectError", "ConnectTimeout"}:
+                        raise
+                    raise ModelOutputError(f"the local model did not answer ({type(e).__name__})") from e
+            if r.status_code != 200:
+                raise ModelOutputError(f"the local model returned an error: {r.text[:300]}")
+            last = (r.json().get("message") or {}).get("content", "")
+            try:
+                return schema.model_validate_json(last)
+            except ValueError:
+                continue
+        raise ModelOutputError(f"the local model returned no valid {schema.__name__}: {last[:200]!r}")
+
+    async def aclose(self) -> None:
+        if self._http is not None:
+            await self._http.aclose()
+
+
+def local_model_ready(url: str, model: str) -> bool | None:
+    """True when Ollama has the model, False when it doesn't, None when Ollama can't be reached."""
+    from urllib.request import urlopen
+
+    try:
+        with urlopen(url.rstrip("/") + "/api/tags", timeout=3) as r:  # noqa: S310 - local URL
+            names = {m.get("name", "") for m in json.load(r).get("models", [])}
+    except Exception:  # noqa: BLE001
+        return None
+    want = model if ":" in model else model + ":latest"
+    return want in names
+
+
+BACKENDS = {"local": "on this computer (Ollama)", "cli": "Claude, through Claude Code", "api": "Claude, API key"}
+
+
+def normalize_backend(name: str | None) -> str | None:
+    """User-facing names: local | claude | api ("claude" means the Claude Code login, i.e. "cli")."""
+    if name is None:
+        return None
+    name = name.strip().lower()
+    return {"claude": "cli", "ollama": "local"}.get(name, name)
+
+
+def make_reasoner(backend: str, model: str, *, ollama_url: str = "http://localhost:11434") -> ClaudeReasoner:
+    """backend "local": a model in the local Ollama, nothing leaves the machine. "cli": the local Claude Code login
+    (no API key). "api": ANTHROPIC_API_KEY."""
+    backend = normalize_backend(backend)
+    if backend == "local":
+        ready = local_model_ready(ollama_url, model)
+        if ready is None:
+            raise RuntimeError(f"Could not reach Ollama at {ollama_url}. Start it (see README, Setup step 2).")
+        if not ready:
+            raise RuntimeError(f"The local model {model} is not downloaded yet. Download it with: "
+                               f"docker exec claim-verifier-ollama ollama pull {model}  (or choose Claude instead).")
+        return OllamaReasoner(model, url=ollama_url)
     if backend == "api":
         if not os.environ.get("ANTHROPIC_API_KEY"):
             raise RuntimeError("ANTHROPIC_API_KEY is not set.")
@@ -252,4 +338,4 @@ def make_reasoner(backend: str, model: str) -> ClaudeReasoner:
         if shutil.which("claude") is None:
             raise RuntimeError("The Claude Code command (claude) was not found.")
         return ClaudeCodeReasoner(model)
-    raise RuntimeError(f"Unknown VERIFIER_BACKEND {backend!r}: use cli or api.")
+    raise RuntimeError(f"Unknown backend {backend!r}: use local, claude or api.")

@@ -123,13 +123,18 @@ async def _run(args, reasoner, store, input_fn, *, ask=None, say=print) -> int:
 
     settings = VerifierSettings()
     own_reasoner = reasoner is None
+    checked_with = None
     if reasoner is None:
-        from verifier.reasoner import make_reasoner
+        from verifier.reasoner import BACKENDS, make_reasoner, normalize_backend
 
+        backend = normalize_backend(getattr(args, "backend", None) or settings.backend)
+        model = settings.model_for(backend)
         try:
-            reasoner = make_reasoner(settings.backend, settings.model)
+            reasoner = make_reasoner(backend, model, ollama_url=settings.ollama_url)
         except RuntimeError as e:
             raise _Exit(2, str(e))
+        checked_with = f"{model}, {BACKENDS.get(backend, backend)}"
+        say(f"Reasoning with {checked_with}")
 
     engine = None
     try:
@@ -169,6 +174,7 @@ async def _run(args, reasoner, store, input_fn, *, ask=None, say=print) -> int:
         for line in result["report"].failures:
             say(f"Note: {line}")
         report = result["report"]
+        report.checked_with = checked_with
         try:
             md_path, json_path = write_report(report, folder)
         except OSError:
@@ -212,6 +218,10 @@ def main(argv: list[str], *, reasoner=None, store: Store | None = None, input_fn
     run.add_argument("--answers", help="YAML file mapping question id to answer")
     run.add_argument("--unattended", action="store_true",
                      help="never prompt: a question not in --answers gets its last (non-committal) choice")
+    run.add_argument("--backend", choices=["local", "claude", "api"],
+                     help="where the reasoning runs: local = Ollama on this computer, nothing leaves it; "
+                          "claude = Claude through Claude Code (document text is sent to Anthropic); "
+                          "api = Claude with ANTHROPIC_API_KEY. Default: VERIFIER_BACKEND, else local")
     args = parser.parse_args(argv)
     try:
         return asyncio.run(_run(args, reasoner, store, input_fn))

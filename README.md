@@ -80,8 +80,9 @@ It is most useful when:
 
 ## Where you should not use it
 
-- **Confidential documents.** The document text is sent to Claude (a cloud model). Use only made-up, public, or
-  documents you are allowed to send outside the machine. No client data, no personal data.
+- **Confidential documents with the Claude option.** With *Claude*, document text is sent to Anthropic. For
+  confidential documents use *On this computer* (the default): nothing leaves the machine. See
+  [Local or Claude](#local-or-claude).
 - **Opinion or judgement questions** ("Is this policy fair?"). It checks facts, not views.
 - **Scanned PDFs and images.** There is no OCR: a PDF made of page pictures is refused. Use the original Word or text file.
 - **Urdu / Roman Urdu documents.** Not tuned or tested for them yet.
@@ -100,13 +101,35 @@ It is most useful when:
 Up to 25 MB per file (100 MB per check in the browser). Password-protected or damaged files are refused with a
 sentence saying what to do. Images (`.png`, `.jpg`) are not read.
 
+## Local or Claude
+
+The reading, searching and storing always happen on this computer. Only the reasoning steps (pulling out claims,
+judging evidence, writing the answer) use a language model, and you choose which one for each check:
+
+| | On this computer (`local`, default) | Claude (`claude`) |
+|---|---|---|
+| Document text leaves the computer | **no** | yes, to Anthropic |
+| Model | `qwen3.5:4b` in Ollama, as Ask the Workspace uses | `claude-sonnet-5-5` |
+| Time for 5 short documents | minutes (no graphics card: each call is slow) | about 1 minute |
+| Accuracy | lower: a small model misses more | higher |
+
+Download the local model once (3.4 GB):
+
+```bash
+docker exec claim-verifier-ollama ollama pull qwen3.5:4b
+```
+
+In the terminal: `uv run python -m verifier run my-check --backend local` (or `--backend claude`). In the page:
+step 4. Until the local model is downloaded, *On this computer* shows "Not ready" and only Claude can run.
+
 ## What you need
 
 | Thing | Why | Check |
 |---|---|---|
 | Linux or macOS with **Docker** | runs the document database and the search model | `docker ps` |
 | **uv** (Python package manager) | installs and runs the project (Python 3.12+) | `uv --version` |
-| **Claude Code**, installed and signed in | the reasoning model is reached through your Claude Code login — no API key needed | `claude --version` |
+| **Claude Code**, installed and signed in (only for the Claude option) | Claude is reached through your Claude Code login, no API key needed | `claude --version` |
+| **qwen3.5:4b** in Ollama (only for the local option) | the private reasoning model, 3.4 GB | `docker exec claim-verifier-ollama ollama list` |
 | **LibreOffice** (optional) | reads older/open formats: .doc .rtf .odt .xls .ods .ppt .odp | `soffice --version` |
 | ~2 GB disk, ~3 GB free RAM | database + search model (bge-m3) | |
 
@@ -167,13 +190,15 @@ uv run python -m verifier.web
 This opens **http://127.0.0.1:8765** (only this computer can reach it; `--port 9000` to change the port,
 `--no-browser` to not open a tab). Stop it with Ctrl+C.
 
-1. **Check the three dots at the top** — Database, Search model, Claude. Green means ready; hover a red one to see
+1. **Check the three dots at the top**: Database, Search model, and the reasoning model you picked in step 4. Green means ready; hover a red one to see
    what to start.
 2. **Type your question.**
 3. **Add documents**: drop files on the box or click *choose files* (PDF, Word, Excel, PowerPoint, OpenDocument, RTF,
    Markdown, CSV or plain text; up to 25 MB each — see [File types](#file-types)). For each one you can set the
    **date** it was issued (filled in automatically when the file name or first lines contain a date like
    `2025-03-01`) and tick which other documents it **replaces**. Remove one with ×.
+4. **Choose where the reasoning runs**: *On this computer (private)* or *Claude (cloud)*. The page remembers your
+   choice; each report says which model checked it.
    No documents at hand? Click **Try the example** to load the five Riverbend test documents.
 4. Click **Run check**. The steps show *Reading documents → Checking claims → Your decision → Report*
    (about a minute for a few short documents).
@@ -332,7 +357,8 @@ All optional, set as environment variables:
 
 | Variable | Default | What it does |
 |---|---|---|
-| `VERIFIER_BACKEND` | `cli` | `cli`: Claude through the local Claude Code login (no key). `api`: the Anthropic API, needs `ANTHROPIC_API_KEY`. |
+| `VERIFIER_BACKEND` | `local` | `local`: a model in Ollama on this computer, nothing leaves it. `cli` (or `claude`): Claude through the Claude Code login (no key). `api`: the Anthropic API, needs `ANTHROPIC_API_KEY`. The page and `--backend` override it per check. |
+| `VERIFIER_LOCAL_MODEL` | `qwen3.5:4b` | The Ollama model for `local` (the same one Ask the Workspace answers with). |
 | `VERIFIER_MODEL` | `claude-sonnet-5-5` | Which Claude model reasons. |
 | `VERIFIER_DATABASE_URL` | `postgresql+asyncpg://postgres:postgres@localhost:55432/postgres` | Document database. |
 | `VERIFIER_OLLAMA_URL` | `http://localhost:11434` | Search model server. |
@@ -402,8 +428,8 @@ doc_facts (date, "replaces")   one per document, in parallel
 
 - **Search** is Laraib's RAG pipeline from Ask the Workspace: hybrid pgvector + keyword search over chunks embedded
   with bge-m3 through Ollama.
-- **Reasoning** (reading, extracting, judging, rewording, writing the answer) is Claude with structured output, so
-  every reply is checked against a schema.
+- **Reasoning** (reading, extracting, judging, rewording, writing the answer) is the model you choose (local
+  Ollama or Claude) with structured output, so every reply is checked against a schema.
 - **Labelling is not left to the model.** The model says which passages support or contradict a claim; plain
   Python rules turn that plus the dates into the label. A claim's own sentence never counts as its own support.
 - **Document text is treated as data**, wrapped in tags and escaped, so instructions hidden in a document are not
@@ -432,7 +458,7 @@ verifier/            the Claim Verifier
   webui/static/      fonts, logo and header theme copied from Ask the Workspace
   graph.py           the LangGraph graph
   rules.py           labelling, outdated rule, when to ask a person, which claim answers
-  reasoner.py        Claude calls (Claude Code login or API) and their schemas
+  reasoner.py        model calls (local Ollama, Claude Code login or API) and their schemas
   prompts.py         all prompt text
   search.py          evidence search over the indexed documents
   store.py           database setup and indexing

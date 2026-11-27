@@ -90,3 +90,4 @@ class Report(BaseModel):
     failures: list[str] = []
     asked: list[PersonQuestion] = []
     completed: bool = True  # False when model failures meant the check could not run (I1)
+    checked_with: str | None = None  # which model did the reasoning, and where ("qwen3.5:4b, on this computer")
